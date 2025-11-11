@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Acordes de Guitarra y Ukelele</title>
+    <!-- Cargar Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos para el diapasón (Fretboard) */
+        #fretboard-svg {
+            background-color: #5d4a36; /* Color de madera oscura */
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: height 0.3s ease; /* Transición suave al cambiar de instrumento */
+        }
+
+        /* Trastes (Frets) */
+        .fret {
+            stroke: #808080; /* Gris */
+            stroke-width: 3;
+        }
+
+        /* Cuerdas (Strings) */
+        .string-line {
+            stroke: #e2e8f0; /* Blanco (color de cuerda) */
+            stroke-width: 2;
+        }
+
+        /* Puntos de Digitacion (Fingering Dots) */
+        .fingering-dot {
+            fill: #ef4444; /* Rojo/Rosa llamativo */
+            stroke: #333;
+            stroke-width: 1.5;
+            transition: fill 0.2s;
+        }
+
+        /* Indicador de Silencio/Mute */
+        .mute-x {
+            font-size: 20px;
+            font-weight: bold;
+            fill: #f87171; /* Rojo claro */
+        }
+        /* Indicador de Cuerda Abierta */
+        .open-o {
+            font-size: 20px;
+            font-weight: bold;
+            fill: #4ade80; /* Verde claro */
+        }
+        /* Etiqueta del Traste Inferior */
+        .fret-number-label {
+            font-size: 14px;
+            fill: #ccc;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center h-full font-sans p-4">
+
+    <div class="w-full max-w-xl text-center bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
+        <h1 class="text-3xl font-extrabold mb-4 text-pink-400">🎸 Visualizador de Acordes</h1>
+        <p class="text-gray-400 mb-6">Selecciona el instrumento, la nota y el tipo de acorde.</p>
+
+        <!-- Controles de Selección de Instrumento -->
+        <div class="mb-4">
+            <label for="instrument-select" class="block text-sm font-medium text-gray-300 mb-1">Instrumento</label>
+            <select id="instrument-select" class="w-full bg-gray-700 text-white p-3 rounded-lg text-lg focus:ring-blue-500 focus:border-blue-500">
+                <option value="guitar">Guitarra (6 Cuerdas)</option>
+                <option value="ukulele">Ukelele (4 Cuerdas)</option>
+            </select>
+        </div>
+
+        <!-- Controles de Selección de Acorde -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <!-- Selector de Nota Raíz -->
+            <select id="root-note-select" class="flex-1 bg-gray-700 text-white p-3 rounded-lg text-lg focus:ring-blue-500 focus:border-blue-500">
+                <option value="C">C (Do)</option>
+                <option value="C#">C# (Do#)</option>
+                <option value="D">D (Re)</option>
+                <option value="D#">D# (Re#)</option>
+                <option value="E">E (Mi)</option>
+                <option value="F">F (Fa)</option>
+                <option value="F#">F# (Fa#)</option>
+                <option value="G">G (Sol)</option>
+                <option value="G#">G# (Sol#)</option>
+                <option value="A">A (La)</option>
+                <option value="A#">A# (La#)</option>
+                <option value="B">B (Si)</option>
+            </select>
+            <!-- Selector de Tipo de Acorde -->
+            <select id="chord-type-select" class="flex-1 bg-gray-700 text-white p-3 rounded-lg text-lg focus:ring-blue-500 focus:border-blue-500">
+                <option value="maj">Mayor</option>
+                <option value="min">Menor</option>
+                <option value="7">Séptima (Dominante)</option>
+                <option value="maj7">Mayor Séptima</option>
+                <option value="min7">Menor Séptima</option>
+                <option value="sus4">Sus 4</option>
+                <option value="dim">Disminuido</option>
+            </select>
+        </div>
+
+        <!-- Título del Acorde Actual -->
+        <div id="chord-name-display" class="text-5xl font-extrabold text-yellow-400">C Mayor</div>
+        <!-- Nueva Referencia Técnica (Ej: Cmaj) -->
+        <div id="chord-reference-display" class="text-lg font-mono text-gray-400 mb-6">Cmaj</div>
+
+
+        <!-- Diapasón SVG -->
+        <svg id="fretboard-svg" viewBox="0 0 350 250" class="w-full h-auto">
+            <g id="fret-lines"></g> <!-- Trastes -->
+            <g id="string-lines"></g> <!-- Cuerdas -->
+            <g id="dot-container"></g> <!-- Puntos de digitación dinámicos -->
+            <g id="open-mute-indicators"></g> <!-- Indicadores de Cuerda Abierta/Silencio y Etiqueta de Traste -->
+            <g id="fret-number-labels"></g> <!-- Etiquetas de Traste Debajo del Diagrama -->
+        </svg>
+
+        <!-- Botón para Tocar el Acorde -->
+        <button id="play-chord-button" class="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all shadow-lg hover:shadow-xl">
+            🔊 Tocar Acorde
+        </button>
+
+        <!-- Mensaje de estado -->
+        <p id="message" class="text-gray-400 mt-4 h-5">Pulsa "Tocar Acorde" para escuchar.</p>
+    </div>
+
+    <script>
+        // --- Constantes y Mapeo ---
+        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const A4_FREQ = 440;
+        
+        // --- Referencias del DOM y Audio ---
+        const instrumentSelect = document.getElementById('instrument-select');
+        const rootNoteSelect = document.getElementById('root-note-select');
+        const chordTypeSelect = document.getElementById('chord-type-select');
+        const chordNameDisplay = document.getElementById('chord-name-display');
+        const chordReferenceDisplay = document.getElementById('chord-reference-display'); // Nuevo elemento
+        const fretLinesContainer = document.getElementById('fret-lines');
+        const stringLinesContainer = document.getElementById('string-lines');
+        const dotContainer = document.getElementById('dot-container');
+        const openMuteIndicators = document.getElementById('open-mute-indicators');
+        const fretNumberLabelsContainer = document.getElementById('fret-number-labels');
+        const playChordButton = document.getElementById('play-chord-button');
+        const message = document.getElementById('message');
+        const fretboardSVG = document.getElementById('fretboard-svg');
+
+        let audioContext;
+        
+        // --- Definiciones de Instrumentos y Acordes (BASE DE DATOS AMPLIADA) ---
+        const INSTRUMENT_CONFIG = {
+            'guitar': {
+                name: 'Guitarra',
+                strings: 6,
+                tuning: [40, 45, 50, 55, 59, 64], // E2, A2, D3, G3, B3, E4
+                chordData: {
+                    // === MAYOR (maj) ===
+                    'Cmaj': [-1, 3, 2, 0, 1, 0], 'C#maj': [-1, 4, 6, 6, 6, 4], 'Dmaj': [-1, -1, 0, 2, 3, 2],
+                    'D#maj': [-1, -1, 1, 3, 4, 3], 'Emaj': [0, 2, 2, 1, 0, 0], 'Fmaj': [1, 3, 3, 2, 1, 1], 
+                    'F#maj': [2, 4, 4, 3, 2, 2], 'Gmaj': [3, 2, 0, 0, 0, 3], 'G#maj': [4, 6, 6, 5, 4, 4], 
+                    'Amaj': [-1, 0, 2, 2, 2, 0], 'A#maj': [6, 8, 8, 7, 6, 6], 'Bmaj': [-1, 2, 4, 4, 4, 2], 
+                    
+                    // === MENOR (min) ===
+                    'Cmin': [-1, 3, 5, 5, 4, 3], 'C#min': [-1, 4, 6, 6, 5, 4], 'Dmin': [-1, -1, 0, 2, 3, 1],
+                    'D#min': [-1, -1, 1, 3, 4, 2], 'Emin': [0, 2, 2, 0, 0, 0], 'Fmin': [1, 3, 3, 1, 1, 1],
+                    'F#min': [2, 4, 4, 2, 2, 2], 'Gmin': [3, 5, 5, 3, 3, 3], 'G#min': [4, 6, 6, 4, 4, 4], 
+                    'Amin': [-1, 0, 2, 2, 1, 0], 'A#min': [6, 8, 8, 6, 6, 6], 'Bmin': [-1, 2, 4, 4, 3, 2],
+                    
+                    // === SEPTIMA DOMINANTE (7) ===
+                    'C7': [-1, 3, 2, 3, 1, 0], 'C#7': [-1, 4, 3, 4, 4, 4], 'D7': [-1, -1, 0, 2, 1, 2],
+                    'D#7': [-1, -1, 1, 3, 2, 3], 'E7': [0, 2, 0, 1, 0, 0], 'F7': [1, 3, 1, 2, 1, 1], 
+                    'F#7': [2, 4, 2, 3, 2, 2], 'G7': [3, 2, 0, 0, 0, 1], 'G#7': [4, 6, 4, 5, 4, 4], 
+                    'A7': [-1, 0, 2, 0, 2, 0], 'A#7': [6, 8, 6, 7, 6, 6], 'B7': [-1, 2, 1, 2, 0, 2],
+                    
+                    // === MAYOR SEPTIMA (maj7) ===
+                    'Cmaj7': [-1, 3, 2, 0, 0, 0], 'C#maj7': [-1, 4, 6, 5, 6, 4], 'Dmaj7': [-1, -1, 0, 2, 2, 2],
+                    'D#maj7': [-1, -1, 1, 3, 3, 3], 'Emaj7': [0, 2, 1, 1, 0, 0], 'Fmaj7': [1, 3, 3, 2, 1, 0], 
+                    'F#maj7': [2, 4, 3, 3, 2, 2], 'Gmaj7': [3, 2, 0, 0, 0, 2], 'G#maj7': [4, 6, 5, 5, 4, 4], 
+                    'Amaj7': [-1, 0, 2, 1, 2, 0], 'A#maj7': [6, 8, 7, 7, 6, 6], 'Bmaj7': [-1, 2, 4, 3, 4, 2],
+
+                    // === MENOR SEPTIMA (min7) ===
+                    'Cmin7': [-1, 3, 5, 3, 4, 3], 'C#min7': [-1, 4, 6, 4, 6, 4], 'Dmin7': [-1, -1, 0, 2, 1, 1],
+                    'D#min7': [-1, -1, 1, 3, 2, 2], 'Emin7': [0, 2, 0, 0, 0, 0], 'Fmin7': [1, 3, 1, 1, 1, 1],
+                    'F#min7': [2, 4, 2, 2, 2, 2], 'Gmin7': [3, 5, 3, 3, 3, 3], 'G#min7': [4, 6, 4, 4, 4, 4],
+                    'Amin7': [-1, 0, 2, 0, 1, 0], 'A#min7': [6, 8, 6, 6, 6, 6], 'Bmin7': [-1, 2, 4, 2, 3, 2],
+                    
+                    // === SUS 4 (sus4) ===
+                    'Csus4': [-1, 3, 3, 0, 1, 1], 'Dsus4': [-1, -1, 0, 2, 3, 3], 'Esus4': [0, 2, 2, 2, 0, 0],
+                    'Fsus4': [1, 3, 3, 3, 1, 1], 'Gsus4': [3, 3, 0, 0, 1, 3], 'Asus4': [-1, 0, 2, 2, 3, 0],
+                    'Bsus4': [-1, 2, 4, 4, 5, 2],
+                    
+                    // === DISMINUIDO (dim) ===
+                    'Cdim': [-1, 3, 4, 2, 4, -1], 'Ddim': [-1, -1, 0, 1, 0, 1], 'Edim': [0, 1, 2, 0, 2, 0],
+                    'Fdim': [1, 2, 3, 1, 3, 1], 'Gdim': [3, 4, 5, 3, 5, 3], 'Adim': [-1, 0, 1, 2, 1, 2],
+                    'Bdim': [-1, 2, 3, 1, 3, 1],
+                    
+                    // --- Fallback ---
+                    'default': [-1, 3, 2, 0, 1, 0] // C Major
+                }
+            },
+            'ukulele': {
+                name: 'Ukelele',
+                strings: 4,
+                tuning: [67, 60, 64, 69], // G4, C4, E4, A4 (Cuerda 4 a Cuerda 1)
+                chordData: {
+                    // === MAYOR (maj) ===
+                    'Cmaj': [0, 0, 0, 3], 'C#maj': [1, 1, 1, 4], 'Dmaj': [2, 2, 2, 0],
+                    'D#maj': [3, 3, 3, 1], 'Emaj': [4, 4, 4, 2], 'Fmaj': [2, 0, 1, 0],
+                    'F#maj': [3, 1, 2, 1], 'Gmaj': [0, 2, 3, 2], 'G#maj': [1, 3, 4, 3], 
+                    'Amaj': [2, 1, 0, 0], 'A#maj': [3, 2, 1, 1], 'Bmaj': [4, 3, 2, 2],
+                    
+                    // === MENOR (min) ===
+                    'Cmin': [3, 3, 3, 6], 'C#min': [1, 4, 4, 3], 'Dmin': [2, 2, 1, 0],
+                    'D#min': [3, 3, 2, 1], 'Emin': [0, 4, 3, 2], 'Fmin': [1, 3, 4, 1],
+                    'F#min': [3, 1, 2, 1], 'Gmin': [0, 2, 3, 1], 'G#min': [1, 3, 4, 2],
+                    'Amin': [2, 0, 0, 0], 'A#min': [3, 1, 1, 1], 'Bmin': [4, 2, 2, 2],
+                    
+                    // === SEPTIMA DOMINANTE (7) ===
+                    'C7': [0, 0, 0, 1], 'C#7': [1, 1, 1, 2], 'D7': [2, 0, 2, 0],
+                    'D#7': [3, 1, 3, 1], 'E7': [1, 2, 0, 2], 'F7': [2, 3, 1, 0],
+                    'F#7': [3, 4, 2, 1], 'G7': [0, 2, 1, 2], 'G#7': [1, 3, 2, 3],
+                    'A7': [0, 1, 0, 0], 'A#7': [1, 2, 1, 1], 'B7': [2, 4, 2, 2],
+                    
+                    // === MAYOR SEPTIMA (maj7) ===
+                    'Cmaj7': [0, 0, 0, 2], 'C#maj7': [1, 1, 1, 3], 'Dmaj7': [2, 2, 2, 4],
+                    'D#maj7': [3, 3, 3, 5], 'Emaj7': [4, 4, 4, 6], 'Fmaj7': [2, 0, 0, 0],
+                    'F#maj7': [3, 1, 1, 1], 'Gmaj7': [0, 2, 2, 2], 'G#maj7': [1, 3, 3, 3],
+                    'Amaj7': [2, 1, 0, 4], 'A#maj7': [3, 2, 1, 5], 'Bmaj7': [4, 3, 2, 6],
+
+                    // === MENOR SEPTIMA (min7) ===
+                    'Cmin7': [3, 3, 3, 3], 'C#min7': [4, 4, 4, 4], 'Dmin7': [2, 2, 1, 3],
+                    'D#min7': [3, 3, 2, 4], 'Emin7': [0, 2, 0, 2], 'Fmin7': [1, 3, 1, 4],
+                    'F#min7': [2, 4, 2, 5], 'Gmin7': [3, 5, 3, 6], 'G#min7': [1, 3, 2, 1],
+                    'Amin7': [2, 0, 3, 0], 'A#min7': [3, 1, 4, 1], 'Bmin7': [4, 2, 5, 2],
+                    
+                    // === SUS 4 (sus4) ===
+                    'Csus4': [0, 0, 1, 3], 'Dsus4': [2, 0, 3, 0], 'Esus4': [0, 2, 2, 2],
+                    'Fsus4': [3, 0, 1, 1], 'Gsus4': [0, 2, 3, 3], 'Asus4': [2, 2, 0, 0],
+                    'Bsus4': [4, 4, 2, 2],
+                    
+                    // === DISMINUIDO (dim) ===
+                    'Cdim': [2, 3, 2, 3], 'Ddim': [1, 2, 1, 2], 'Edim': [0, 1, 0, 1],
+                    'Fdim': [1, 2, 1, 2], 'Gdim': [3, 4, 3, 4], 'Adim': [0, 1, 0, 1],
+                    'Bdim': [1, 2, 1, 2],
+                    
+                    // --- Fallback ---
+                    'default': [0, 0, 0, 3] // C Mayor
+                }
+            }
+        };
+
+        // --- Funciones de Utilidad Musical y Gráfica ---
+
+        function midiToFrequency(midiNote) {
+            return A4_FREQ * Math.pow(2, (midiNote - 69) / 12);
+        }
+
+        function getNoteMidi(stringIndex, fretNumber, instrument) {
+            const config = INSTRUMENT_CONFIG[instrument];
+            // Tuning is ordered from the lowest pitched string (index 0) to the highest (index N-1)
+            const openMidi = config.tuning[stringIndex];
+            return openMidi + fretNumber;
+        }
+
+        function getChordPattern(instrument) {
+            const rootNote = rootNoteSelect.value;
+            const chordType = chordTypeSelect.value;
+            const config = INSTRUMENT_CONFIG[instrument];
+            
+            const exactKey = rootNote + chordType;
+            
+            if (config.chordData[exactKey]) {
+                return { pattern: config.chordData[exactKey], isFallback: false };
+            }
+            
+            // Fallback for chords not explicitly defined
+            return { pattern: config.chordData['default'], isFallback: true };
+        }
+
+        function getStartingFret(pattern) {
+            const frettedNotes = pattern.filter(f => f > 0);
+            
+            if (frettedNotes.length === 0) {
+                return 1;
+            }
+            
+            const minFret = Math.min(...frettedNotes);
+            
+            if (minFret === 1) {
+                return 1;
+            }
+            
+            return minFret;
+        }
+
+        function renderFretboardUI(startingFret) {
+            const instrument = instrumentSelect.value;
+            const config = INSTRUMENT_CONFIG[instrument];
+            const numStrings = config.strings;
+            const numFrets = 4; 
+            
+            const totalWidth = 350;
+            const fretSpacing = 50; 
+            
+            const START_Y_DRAWING = 50; 
+            const DRAW_HEIGHT = 150;    
+            const SVG_HEIGHT = DRAW_HEIGHT + START_Y_DRAWING + 40; 
+
+            fretboardSVG.setAttribute('viewBox', `0 0 ${totalWidth} ${SVG_HEIGHT}`);
+
+            const stringSpacing = DRAW_HEIGHT / (numStrings - 1);
+            
+            fretLinesContainer.innerHTML = '';
+            fretNumberLabelsContainer.innerHTML = '';
+            
+            // 1. Draw Frets
+            for (let i = 0; i <= numFrets; i++) {
+                const xPos = 50 + (i * fretSpacing);
+                const fretLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                fretLine.setAttribute('class', 'fret');
+                fretLine.setAttribute('x1', xPos);
+                fretLine.setAttribute('y1', START_Y_DRAWING);
+                fretLine.setAttribute('x2', xPos);
+                fretLine.setAttribute('y2', START_Y_DRAWING + DRAW_HEIGHT);
+                
+                if (startingFret === 1 && i === 0) {
+                     fretLine.setAttribute('stroke-width', '5'); // Nut (thick)
+                } else {
+                    fretLine.setAttribute('stroke-width', '3'); // Standard fret or section start (thin)
+                }
+                
+                fretLinesContainer.appendChild(fretLine);
+
+                // 2. Draw Fret Number Labels (below the diagram)
+                if (i < numFrets) {
+                    const fretNumber = startingFret + i; 
+                    const labelX = xPos + (fretSpacing / 2); 
+
+                    const fretLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    fretLabel.setAttribute('x', labelX); 
+                    fretLabel.setAttribute('y', START_Y_DRAWING + DRAW_HEIGHT + 20); 
+                    fretLabel.setAttribute('class', 'fret-number-label');
+                    fretLabel.setAttribute('text-anchor', 'middle');
+                    fretLabel.textContent = fretNumber;
+                    fretNumberLabelsContainer.appendChild(fretLabel);
+                }
+            }
+            
+            // 3. Draw Strings
+            stringLinesContainer.innerHTML = '';
+            const yPositions = [];
+            
+            const fretboardEnd = 50 + (numFrets * fretSpacing); 
+
+            for (let i = 0; i < numStrings; i++) {
+                const yPos = START_Y_DRAWING + (i * stringSpacing); 
+                yPositions.push(yPos);
+                
+                const stringLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                stringLine.setAttribute('class', 'string-line');
+                stringLine.setAttribute('x1', 50);
+                stringLine.setAttribute('y1', yPos);
+                stringLine.setAttribute('x2', fretboardEnd);
+                stringLine.setAttribute('y2', yPos);
+                stringLinesContainer.appendChild(stringLine);
+            }
+
+            return yPositions;
+        }
+
+
+        /**
+         * Renders the fingering pattern on the SVG.
+         */
+        function renderChordPattern() {
+            const instrument = instrumentSelect.value;
+            const { pattern, isFallback } = getChordPattern(instrument);
+            
+            const startingFret = getStartingFret(pattern);
+            const yPositions = renderFretboardUI(startingFret); 
+            
+            dotContainer.innerHTML = '';
+            openMuteIndicators.innerHTML = '';
+
+            const START_Y_DRAWING = 50; 
+            const FRET_SPACING = 50;
+
+            const exactKey = rootNoteSelect.value + chordTypeSelect.value;
+            
+            // Display fallback message if necessary
+            if (isFallback) {
+                message.textContent = `Acorde de reserva: ${exactKey} no encontrado. Mostrando C Mayor.`;
+                message.classList.remove('text-gray-400');
+                message.classList.add('text-red-400');
+            } else {
+                message.textContent = 'Pulsa "Tocar Acorde" para escuchar.';
+                message.classList.add('text-gray-400');
+                message.classList.remove('text-red-400');
+            }
+
+
+            // Iterate through the pattern
+            pattern.forEach((fret, stringIndex) => {
+                if (stringIndex >= yPositions.length) return; 
+
+                const stringY = yPositions[stringIndex];
+                
+                // --- Open/Mute Indicators (X or O) ---
+                if (startingFret === 1) {
+                    if (fret === -1) {
+                        // Muted (X)
+                        const xText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        xText.setAttribute('x', 50); 
+                        xText.setAttribute('y', START_Y_DRAWING - 10); 
+                        xText.setAttribute('class', 'mute-x');
+                        xText.setAttribute('text-anchor', 'middle');
+                        // La cuerda que se silencia es la opuesta a como está ordenado el array (si el array tiene 6 elementos, el índice 5 es la cuerda 1)
+                        const stringNumber = pattern.length - stringIndex; 
+                        xText.textContent = 'X';
+                        openMuteIndicators.appendChild(xText);
+                    } else if (fret === 0) {
+                        // Open (O)
+                        const oText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        oText.setAttribute('x', 50);
+                        oText.setAttribute('y', START_Y_DRAWING - 10); 
+                        oText.setAttribute('class', 'open-o');
+                        oText.setAttribute('text-anchor', 'middle');
+                        oText.textContent = 'O';
+                        openMuteIndicators.appendChild(oText);
+                    } 
+                }
+                
+                // --- Fingering Dots ---
+                if (fret >= startingFret && fret < startingFret + 4) {
+                    const relativeFret = fret - startingFret + 1;
+                    const fretX = 50 + (relativeFret * FRET_SPACING) - (FRET_SPACING / 2);
+                    
+                    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    dot.setAttribute('cx', fretX);
+                    dot.setAttribute('cy', stringY);
+                    dot.setAttribute('r', 10);
+                    dot.setAttribute('class', 'fingering-dot');
+                    dotContainer.appendChild(dot);
+                }
+            });
+        }
+
+        /**
+         * Main function that updates the chord name and diagram.
+         */
+        function updateChord() {
+            const root = rootNoteSelect.value;
+            const type = chordTypeSelect.value;
+            
+            // Generar el nombre completo en español
+            let typeName = '';
+            switch(type) {
+                case 'maj': typeName = 'Mayor'; break;
+                case 'min': typeName = 'Menor'; break;
+                case '7': typeName = 'Séptima (Dominante)'; break;
+                case 'maj7': typeName = 'Mayor Séptima'; break;
+                case 'min7': typeName = 'Menor Séptima'; break;
+                case 'sus4': typeName = 'Sus 4'; break;
+                case 'dim': typeName = 'Disminuido'; break;
+            }
+            chordNameDisplay.textContent = `${root} ${typeName}`;
+
+            // Generar la referencia técnica (Ej: F#maj7)
+            const exactKey = root + type;
+            chordReferenceDisplay.textContent = exactKey;
+
+
+            // Renderizar el patrón
+            renderChordPattern();
+        }
+
+        // --- Play Chord (Tone Generation) ---
+
+        function playChord() {
+            if (!audioContext || audioContext.state === 'closed') {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+            }
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.error("Error resuming AudioContext:", e));
+            }
+
+            const instrument = instrumentSelect.value;
+            const { pattern } = getChordPattern(instrument);
+            const now = audioContext.currentTime;
+            
+            message.textContent = 'Tocando acorde...';
+            playChordButton.disabled = true;
+
+            // Iterar sobre el patrón
+            pattern.forEach((fret, stringIndex) => {
+                if (fret >= 0) { 
+                    const midiNote = getNoteMidi(stringIndex, fret, instrument);
+                    const frequency = midiToFrequency(midiNote);
+                    
+                    const osc = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    osc.type = 'sawtooth'; 
+                    osc.frequency.setValueAtTime(frequency, now);
+
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(0.5, now + 0.05);  // Attack
+                    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.15); // Decay
+                    gainNode.gain.linearRampToValueAtTime(0, now + 1.5);    // Release (1.5 seconds)
+                    
+                    osc.start(now);
+                    osc.stop(now + 1.5); 
+                }
+            });
+
+            // Re-enable the button
+            setTimeout(() => {
+                updateChord(); // Reset message
+                playChordButton.disabled = false;
+            }, 1600);
+        }
+
+        // --- Inicialización y Event Listeners ---
+        
+        instrumentSelect.addEventListener('change', updateChord);
+        rootNoteSelect.addEventListener('change', updateChord);
+        chordTypeSelect.addEventListener('change', updateChord);
+        playChordButton.addEventListener('click', playChord);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateChord(); // Show initial chord (Guitar, C Major)
+        });
+
+    </script>
+</body>
+</html>
