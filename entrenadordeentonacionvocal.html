@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrenador de Entonación</title>
+    <!-- Cargar Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos básicos para el pentagrama SVG */
+        #staff-svg {
+            background-color: #f7f7f7;
+            border-radius: 8px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Líneas del pentagrama */
+        .staff-line {
+            stroke: #333;
+            stroke-width: 1.5;
+        }
+
+        /* La nota que el usuario debe cantar */
+        .target-note {
+            fill: #ef4444; /* Rojo */
+            transition: transform 0.2s ease-out;
+        }
+
+        /* Barra de feedback de afinación */
+        #pitch-bar-container {
+            height: 30px;
+            background-color: #4b5563; /* Gris oscuro */
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        
+        #pitch-feedback-bar {
+            height: 100%;
+            width: 50%; /* 50% = centro */
+            background-color: #10b981; /* Verde esmeralda */
+            transform: translateX(0%);
+            transition: transform 0.1s ease-out;
+            position: absolute;
+            left: 50%;
+        }
+
+        /* Estilos para el texto de detune */
+        .detune-text {
+            color: #6b7280; /* Gris */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center h-full font-sans p-4">
+
+    <div class="w-full max-w-lg text-center bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
+        <h1 class="text-3xl font-extrabold mb-4 text-pink-400">🎤 Entrenador de Entonación</h1>
+        <p class="text-gray-400 mb-6">Canta la nota objetivo para avanzar en la escala.</p>
+
+        <!-- Pentagrama Básico (SVG) -->
+        <svg id="staff-svg" viewBox="0 0 350 100" class="w-full h-24 mb-6">
+            <!-- Cinco líneas del pentagrama -->
+            <line class="staff-line" x1="50" y1="20" x2="300" y2="20" />
+            <line class="staff-line" x1="50" y1="35" x2="300" y2="35" />
+            <line class="staff-line" x1="50" y1="50" x2="300" y2="50" />
+            <line class="staff-line" x1="50" y1="65" x2="300" y2="65" />
+            <line class="staff-line" x1="50" y1="80" x2="300" y2="80" />
+            
+            <!-- Nota objetivo (círculo que se mueve) -->
+            <circle id="staff-note-head" class="target-note" cx="175" cy="50" r="6.5" />
+        </svg>
+
+        <!-- Display de Notas -->
+        <div class="mb-6 flex justify-between items-center">
+            <div class="w-1/3">
+                <p class="text-sm text-gray-400">Tu Tono</p>
+                <!-- Tono detectado por el micrófono -->
+                <div id="sung-note-display" class="text-3xl font-bold text-gray-500">--</div>
+            </div>
+            <div class="w-1/3">
+                <p class="text-sm font-semibold text-pink-400">OBJETIVO</p>
+                <!-- Tono que el usuario debe cantar -->
+                <div id="target-note-display" class="text-5xl font-extrabold text-pink-500">C4</div>
+            </div>
+            <div class="w-1/3">
+                <p class="text-sm text-gray-400">Progreso</p>
+                <div id="score-display" class="text-3xl font-bold text-yellow-400">0 / 7</div>
+            </div>
+        </div>
+        
+        <!-- Barra de Feedback de Entonación -->
+        <div id="pitch-bar-container" class="relative mb-6">
+            <div id="pitch-feedback-bar" class="w-1/2"></div>
+            <!-- Indicadores de zona -->
+            <div class="absolute inset-0 flex justify-between items-center text-xs px-2 pointer-events-none">
+                <span id="low-detune-text" class="detune-text">BAJO</span>
+                <span class="font-bold text-white">EN TONO</span>
+                <span id="high-detune-text" class="detune-text">ALTO</span>
+            </div>
+        </div>
+
+        <!-- Botones de Control -->
+        <div class="flex justify-center space-x-4">
+            <button id="startButton" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all shadow-lg hover:shadow-xl">
+                Comenzar Ejercicio
+            </button>
+            <button id="nextButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all shadow-lg hover:shadow-xl disabled:bg-gray-500" disabled>
+                Siguiente
+            </button>
+        </div>
+
+        <p id="message" class="text-gray-300 mt-4 h-5">Escala de Do Mayor</p>
+
+    </div>
+
+    <script>
+        // --- Constantes y Variables Globales ---
+
+        // Nombres de las notas (índice 0 = C, 1 = C#, etc.)
+        const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        
+        // Escala objetivo (Do Mayor - MIDI notes C4 a C5)
+        // [C4, D4, E4, F4, G4, A4, B4, C5]
+        const SCALE_MIDI = [60, 62, 64, 65, 67, 69, 71, 72]; 
+        
+        let audioContext;
+        let analyser;
+        let mediaStreamSource;
+        let dataArray;
+        let isRunning = false;
+        let rafID;
+        
+        let targetOscillator = null; // Oscilador para tocar la nota objetivo
+        let targetNoteIndex = 0;
+        let targetNoteMidi = SCALE_MIDI[0];
+        let score = 0;
+
+        // --- Referencias del DOM ---
+        const startButton = document.getElementById('startButton');
+        const nextButton = document.getElementById('nextButton');
+        const sungNoteDisplay = document.getElementById('sung-note-display');
+        const targetNoteDisplay = document.getElementById('target-note-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const pitchFeedbackBar = document.getElementById('pitch-feedback-bar');
+        const staffNoteHead = document.getElementById('staff-note-head');
+        const messageDisplay = document.getElementById('message');
+
+        // --- Inicialización y Control de Audio ---
+
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                startExercise();
+            } else {
+                stopExercise();
+            }
+        });
+
+        nextButton.addEventListener('click', () => {
+            nextTargetNote();
+        });
+
+        function startExercise() {
+            // Inicializar o reanudar AudioContext
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!audioContext || audioContext.state === 'closed') {
+                audioContext = new AudioContext();
+            }
+
+            // Iniciar AudioContext si está suspendido (móviles)
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.error("Error al reanudar AudioContext:", e));
+            }
+            
+            // Solicitar acceso al micrófono
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    analyser = audioContext.createAnalyser();
+                    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser.fftSize = 4096;
+                    dataArray = new Float32Array(analyser.fftSize); 
+                    
+                    mediaStreamSource.connect(analyser);
+                    
+                    // Iniciar el estado del juego
+                    isRunning = true;
+                    startButton.textContent = 'Detener Ejercicio';
+                    startButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    startButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                    
+                    score = 0;
+                    targetNoteIndex = 0;
+                    updateScoreDisplay();
+                    
+                    // Iniciar el primer target
+                    setTargetNote(SCALE_MIDI[0]);
+                    
+                    // Iniciar el bucle de detección
+                    detectPitch();
+                })
+                .catch(err => {
+                    messageDisplay.textContent = 'Error: No se pudo acceder al micrófono.';
+                    console.error('Error al obtener el micrófono:', err);
+                });
+        }
+
+        function stopExercise() {
+            if (rafID) {
+                cancelAnimationFrame(rafID);
+            }
+            if (mediaStreamSource && mediaStreamSource.mediaStream.getTracks) {
+                mediaStreamSource.mediaStream.getTracks().forEach(track => track.stop());
+            }
+            if (targetOscillator) {
+                targetOscillator.stop();
+                targetOscillator = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+            }
+            
+            isRunning = false;
+            startButton.textContent = 'Comenzar Ejercicio';
+            startButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+            startButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            
+            // Resetear UI
+            sungNoteDisplay.textContent = '--';
+            targetNoteDisplay.textContent = '--';
+            pitchFeedbackBar.style.transform = `translateX(0)`;
+            staffNoteHead.style.display = 'none';
+        }
+
+        // --- Lógica del Ejercicio ---
+
+        /**
+         * Establece y toca la nota objetivo, y actualiza el pentagrama.
+         * @param {number} midiNote El número MIDI de la nota objetivo.
+         */
+        function setTargetNote(midiNote) {
+            targetNoteMidi = midiNote;
+            const targetFreq = 440 * Math.pow(2, (midiNote - 69) / 12);
+            const { noteNameWithOctave } = getNoteData(targetFreq);
+            
+            targetNoteDisplay.textContent = noteNameWithOctave;
+            staffNoteHead.style.display = 'block';
+
+            // 1. Tocar el tono objetivo (usando Tone Generation)
+            if (targetOscillator) {
+                targetOscillator.stop();
+            }
+            
+            targetOscillator = audioContext.createOscillator();
+            targetOscillator.type = 'sine';
+            targetOscillator.frequency.setValueAtTime(targetFreq, audioContext.currentTime);
+            
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            
+            targetOscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            targetOscillator.start(0);
+            
+            // 2. Actualizar el Pentagrama SVG
+            updateStaffVisual(midiNote);
+        }
+
+        function nextTargetNote() {
+            targetNoteIndex++;
+            if (targetNoteIndex >= SCALE_MIDI.length) {
+                messageDisplay.textContent = `¡Escala completada! Puntuación: ${score} / ${SCALE_MIDI.length}`;
+                stopExercise();
+                return;
+            }
+            
+            setTargetNote(SCALE_MIDI[targetNoteIndex]);
+            nextButton.disabled = true; // Desactivar hasta que la nueva nota se iguale
+            messageDisplay.textContent = `Canta ${targetNoteDisplay.textContent}`;
+        }
+
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = `${score} / ${SCALE_MIDI.length}`;
+        }
+        
+        // --- Visualización del Pentagrama SVG ---
+
+        /**
+         * Mueve la cabeza de la nota SVG según el tono MIDI.
+         * @param {number} midiNote La nota a dibujar.
+         */
+        function updateStaffVisual(midiNote) {
+            // Referencia: MIDI 71 (B4) está en la línea superior del pentagrama (y=20)
+            // Cada semitono (midi note) mueve la nota media línea/espacio (7.5px)
+            
+            const referenceMidi = 71; // B4
+            const referenceY = 20;    // Y position of B4 line
+            const stepY = 7.5;        // Half the distance between staff lines (15px)
+            
+            // Calcular el desplazamiento en semitonos desde B4
+            const midiDifference = referenceMidi - midiNote;
+            
+            // Calcular la nueva posición Y
+            const newY = referenceY + (midiDifference * stepY);
+            
+            staffNoteHead.setAttribute('cy', newY);
+        }
+
+
+        // --- Detección y Feedback ---
+
+        function detectPitch() {
+            analyser.getFloatTimeDomainData(dataArray);
+            const frequency = autoCorrelate(dataArray, audioContext.sampleRate);
+            
+            if (frequency > 0) {
+                const noteData = getNoteData(frequency);
+                updateFeedback(noteData);
+            } else {
+                sungNoteDisplay.textContent = '--';
+                pitchFeedbackBar.style.transform = `translateX(0)`; // Centro (sin tono)
+                sungNoteDisplay.classList.remove('text-green-400');
+            }
+
+            rafID = requestAnimationFrame(detectPitch);
+        }
+
+        function updateFeedback(noteData) {
+            const { noteNameWithOctave, detune, nearestNote } = noteData;
+            
+            sungNoteDisplay.textContent = noteNameWithOctave;
+
+            // 1. Feedback de afinación (barra)
+            // Mapear 'detune' (rango -50 a +50 cents) a una posición (rango -50% a +50% del centro)
+            let translation = detune * 1; // 50 cents = 50%
+            translation = Math.max(-50, Math.min(50, translation));
+            
+            // La barra se mueve 50% a la izquierda (bajo) o 50% a la derecha (alto) desde el centro.
+            pitchFeedbackBar.style.transform = `translateX(${translation}%)`;
+            
+            // 2. Comprobación del objetivo
+            const isTargetNote = (nearestNote === targetNoteMidi);
+            const isInTune = Math.abs(detune) < 10; // 10 cents es el umbral para "En Tono"
+            
+            if (isTargetNote && isInTune) {
+                // Éxito: Nota correcta y en tono
+                sungNoteDisplay.classList.add('text-green-400');
+                targetNoteDisplay.classList.add('text-green-400');
+                messageDisplay.textContent = '¡Perfecto!';
+                nextButton.disabled = false;
+                
+                if (nearestNote === targetNoteMidi && !targetNoteMidi.matched) {
+                     // Solo contamos el punto la primera vez que la iguala
+                    score++;
+                    updateScoreDisplay();
+                    targetNoteMidi.matched = true; // Marcar como igualada (para evitar sumar múltiples veces)
+                }
+
+            } else {
+                // Tono incorrecto o desafinado
+                sungNoteDisplay.classList.remove('text-green-400');
+                targetNoteDisplay.classList.remove('text-green-400');
+                nextButton.disabled = true;
+                
+                if (isTargetNote) {
+                    messageDisplay.textContent = 'Casi, ¡afina más!';
+                } else if (nearestNote < targetNoteMidi - 2) {
+                    messageDisplay.textContent = 'Demasiado bajo. Sube el tono.';
+                } else if (nearestNote > targetNoteMidi + 2) {
+                    messageDisplay.textContent = 'Demasiado alto. Baja el tono.';
+                } else {
+                    messageDisplay.textContent = 'Nota incorrecta.';
+                }
+            }
+        }
+
+        // --- Funciones del Afinador (Reutilizadas) ---
+
+        function getNoteData(frequency) {
+            // A4 = 440Hz, MIDI note 69
+            const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2)) + 69;
+            const nearestNote = Math.round(noteNum);
+            
+            const octave = Math.floor(nearestNote / 12) - 1; 
+            const noteName = noteStrings[nearestNote % 12];
+            const noteNameWithOctave = noteName + octave;
+            
+            const expectedFrequency = 440 * Math.pow(2, (nearestNote - 69) / 12);
+            const detune = 1200 * Math.log2(frequency / expectedFrequency);
+            
+            return { noteNameWithOctave, detune, nearestNote };
+        }
+
+        // Implementación de Autocorrelación (mismo código que el afinador)
+        function autoCorrelate(buffer, sampleRate) {
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) { rms += buffer[i] * buffer[i]; }
+            rms = Math.sqrt(rms / buffer.length);
+            
+            if (rms < 0.01) { return -1; }
+
+            const minFreq = 60; 
+            const maxFreq = 1500; 
+            const minSamples = Math.floor(sampleRate / maxFreq);
+            const maxSamples = Math.floor(sampleRate / minFreq);
+
+            let bestOffset = -1;
+            let bestCorrelation = 0;
+            let correlations = new Array(maxSamples).fill(0);
+
+            for (let offset = minSamples; offset < maxSamples; offset++) {
+                let correlation = 0;
+                for (let i = 0; i < buffer.length - offset; i++) {
+                    correlation += buffer[i] * buffer[i + offset];
+                }
+                
+                let sum = 0;
+                for (let i = 0; i < buffer.length - offset; i++) {
+                    sum += buffer[i] * buffer[i] + buffer[i+offset] * buffer[i+offset];
+                }
+                
+                if (sum === 0) continue; 
+
+                correlations[offset] = (2 * correlation) / sum;
+                
+                if (correlations[offset] > bestCorrelation) {
+                    bestCorrelation = correlations[offset];
+                    bestOffset = offset;
+                }
+            }
+
+            if (bestCorrelation > 0.9) { 
+                if (bestOffset > minSamples && bestOffset < maxSamples - 1) {
+                    const d1 = correlations[bestOffset - 1];
+                    const d2 = correlations[bestOffset];
+                    const d3 = correlations[bestOffset + 1];
+                    const shift = (d1 - d3) / (2 * (2 * d2 - d1 - d3));
+                    
+                    return sampleRate / (bestOffset + shift);
+                } else {
+                    return sampleRate / bestOffset;
+                }
+            }
+            return -1;
+        }
+
+        // Inicialización al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+             // Ocultar la nota del pentagrama hasta que inicie
+             staffNoteHead.style.display = 'none';
+        });
+
+    </script>
+</body>
+</html>
