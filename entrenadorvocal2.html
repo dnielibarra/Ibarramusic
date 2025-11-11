@@ -1,0 +1,382 @@
+
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrenador Vocal con Progreso</title>
+    <!-- Cargar Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos base */
+        .vocal-trainer-container {
+            background-color: #1f2937; /* Gray 800 */
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        #pitch-canvas {
+            background-color: #374151; /* Gray 700 */
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        /* Estilo para el input de radio */
+        input[type="radio"]:checked + label {
+            background-color: #059669; /* bg-emerald-600 */
+            color: white;
+            border-color: #10b981;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center h-full font-sans p-4">
+
+    <div class="w-full max-w-lg text-center vocal-trainer-container p-8 border border-gray-700">
+        <h1 class="text-3xl font-extrabold mb-2 text-emerald-400">🎤 Entrenador de Tono Vocal</h1>
+        <p class="text-gray-400 mb-6">Elige tu rango, inicia el micrófono y canta la nota objetivo.</p>
+
+        <!-- Selección de Rango Vocal -->
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-3 text-yellow-300">Rango de Voz:</h2>
+            <div class="flex justify-center space-x-4">
+                <input type="radio" id="voice-low" name="voice-range" value="low" class="hidden" checked>
+                <label for="voice-low" class="px-5 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600">Voz Baja (Graves)</label>
+                
+                <input type="radio" id="voice-high" name="voice-range" value="high" class="hidden">
+                <label for="voice-high" class="px-5 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600">Voz Alta (Agudos)</label>
+            </div>
+        </div>
+
+        <!-- Botón de Inicio -->
+        <button id="start-tuner-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all shadow-lg hover:shadow-xl disabled:bg-gray-600">
+            Iniciar Micrófono
+        </button>
+        <p id="status-message" class="text-lg font-semibold h-6 mt-4 text-yellow-400">Pulsa para iniciar el micrófono...</p>
+
+        <!-- Display de Nota Objetivo y Detectada -->
+        <div class="mt-8 mb-4">
+            <p class="text-sm text-gray-400">Nota Objetivo</p>
+            <div id="target-note" class="text-5xl font-extrabold text-yellow-300">C4</div>
+            <p class="text-sm text-gray-400 mt-2">Tu Nota Detectada</p>
+            <div id="detected-note" class="text-3xl font-extrabold text-white">---</div>
+            <p id="frequency-display" class="text-sm font-mono text-gray-500">0.0 Hz</p>
+        </div>
+
+        <!-- Canvas para Visualización de Tono (Partitura Simplificada) -->
+        <canvas id="pitch-canvas" height="100" width="400" class="mx-auto"></canvas>
+
+        <!-- Barra de Progreso Motivacional -->
+        <div class="mt-6">
+            <p class="text-lg font-semibold text-emerald-400 mb-2">Progreso de Estabilidad (Mantén la nota):</p>
+            <div class="w-full bg-gray-600 rounded-full h-8 overflow-hidden shadow-inner">
+                <div id="progress-bar" class="h-8 bg-emerald-500 transition-all duration-300 ease-out flex items-center justify-center text-sm font-bold" style="width: 0%">
+                    0%
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Constantes Musicales y Tareas ---
+        const A4_FREQ = 440; 
+        const MIDI_A4 = 69;
+        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        
+        // El ejercicio es una simple escala ascendente (C-D-E-F-G)
+        // Definido en MIDI: C4 (60), D4 (62), E4 (64), F4 (65), G4 (67)
+        const TARGET_MIDI_SCALE_C4 = [60, 62, 64, 65, 67]; 
+        
+        let currentTargetIndex = 0;
+        let targetMidiOffset = 0; // 0 para alto (C4), -12 para bajo (C3)
+
+        // --- Configuración de Audio y Detección ---
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let pitchDetectionInterval = null;
+        
+        // --- Variables de Estado y Progreso ---
+        let userProgress = 0; // 0 a 100
+        const ACCURACY_THRESHOLD = 10; // Cents: dentro de +/- 10 cents es "perfecto"
+        const PROGRESS_RATE = 0.5; // Tasa de incremento por tick
+        const DECAY_RATE = 0.1; // Tasa de decremento por tick
+
+        // --- Referencias DOM y Canvas ---
+        const statusMessage = document.getElementById('status-message');
+        const startTunerButton = document.getElementById('start-tuner-button');
+        const detectedNoteDisplay = document.getElementById('detected-note');
+        const targetNoteDisplay = document.getElementById('target-note');
+        const frequencyDisplay = document.getElementById('frequency-display');
+        const progressBar = document.getElementById('progress-bar');
+        const voiceRangeInputs = document.querySelectorAll('input[name="voice-range"]');
+        const canvas = document.getElementById('pitch-canvas');
+        const canvasCtx = canvas.getContext('2d');
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        // --- Utilidades Musicales (Reutilizadas del afinador) ---
+        function freqToMidi(freq) { return MIDI_A4 + (12 * Math.log2(freq / A4_FREQ)); }
+        function midiToFreq(midi) { return A4_FREQ * Math.pow(2, (midi - MIDI_A4) / 12); }
+        function centsOff(freq, targetFreq) { return 1200 * Math.log2(freq / targetFreq); }
+        
+        /**
+         * Detección de tono por Autocorrelación simplificada.
+         * @param {Float32Array} buffer Array de datos de audio.
+         * @param {number} sampleRate Tasa de muestreo.
+         * @returns {number} Frecuencia fundamental detectada en Hz.
+         */
+        function getFundamentalFreq(buffer, sampleRate) {
+            const size = buffer.length;
+            const threshold = 0.05; 
+            let startIndex = 0;
+            for (let i = 0; i < size; i++) {
+                if (Math.abs(buffer[i]) > threshold) { startIndex = i; break; }
+            }
+            if (startIndex === 0) return 0;
+
+            let maxCorr = -1;
+            let bestPeriod = -1;
+            // Rango de búsqueda optimizado para voz humana (aprox 80Hz a 800Hz)
+            const minPeriod = sampleRate / 800;
+            const maxPeriod = sampleRate / 80; 
+
+            for (let tau = Math.floor(minPeriod); tau <= Math.floor(maxPeriod); tau++) {
+                let correlation = 0;
+                for (let i = startIndex; i < size - tau; i++) {
+                    correlation += buffer[i] * buffer[i + tau];
+                }
+                if (correlation > maxCorr) {
+                    maxCorr = correlation;
+                    bestPeriod = tau;
+                }
+            }
+
+            if (bestPeriod > 0 && maxCorr > (0.1 * size)) { 
+                return sampleRate / bestPeriod;
+            }
+            return 0; 
+        }
+
+        // --- Lógica del Ejercicio y Progreso ---
+        
+        function updateTargetNote() {
+            const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
+            const targetFreq = midiToFreq(targetMidi);
+            const noteIndex = targetMidi % 12;
+            targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + (Math.floor(targetMidi / 12) - 1);
+            return targetFreq;
+        }
+
+        function updateProgress(cents) {
+            const absCents = Math.abs(cents);
+            
+            if (absCents <= ACCURACY_THRESHOLD) {
+                // Ganar progreso por mantener el tono
+                userProgress += PROGRESS_RATE;
+                progressBar.classList.remove('bg-yellow-500', 'bg-red-500');
+                progressBar.classList.add('bg-emerald-500');
+            } else if (absCents <= 30) {
+                // Mantenimiento de progreso (cerca, pero no perfecto)
+                userProgress -= DECAY_RATE / 2;
+                progressBar.classList.remove('bg-emerald-500', 'bg-red-500');
+                progressBar.classList.add('bg-yellow-500');
+            } else {
+                // Perder progreso por desafinar mucho
+                userProgress -= DECAY_RATE;
+                progressBar.classList.remove('bg-emerald-500', 'bg-yellow-500');
+                progressBar.classList.add('bg-red-500');
+            }
+
+            // Asegurar que el progreso esté entre 0 y 100
+            userProgress = Math.max(0, Math.min(100, userProgress));
+            
+            progressBar.style.width = `${userProgress.toFixed(0)}%`;
+            progressBar.textContent = `${userProgress.toFixed(0)}%`;
+
+            // Si se completa el 100%, pasar a la siguiente nota (motivacional)
+            if (userProgress >= 100) {
+                userProgress = 0; // Resetear para la nueva nota
+                currentTargetIndex = (currentTargetIndex + 1) % TARGET_MIDI_SCALE_C4.length;
+                updateTargetNote(); // Mover a la siguiente nota de la escala
+                statusMessage.textContent = '¡Excelente! Pasando a la siguiente nota.';
+            }
+        }
+
+        // --- Funciones de Dibujo (Canvas) ---
+
+        /**
+         * Dibuja la visualización de tono.
+         * @param {number} cents Desviación en cents.
+         * @param {boolean} isPlaying Indica si se detectó un tono.
+         */
+        function drawPitchVisual(cents, isPlaying) {
+            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+            const center = HEIGHT / 2;
+            
+            // 1. Dibujar la línea de la Nota Objetivo
+            canvasCtx.strokeStyle = '#fcd34d'; // Amarillo 300
+            canvasCtx.lineWidth = 3;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, center);
+            canvasCtx.lineTo(WIDTH, center);
+            canvasCtx.stroke();
+            
+            // 2. Dibujar la Banda de Afinación Correcta (+/- 10 cents)
+            const rangeY = 10; // +- 10 cents para el rango de perfección
+            const pixelsPerCent = HEIGHT / 100; // Mapear 100 cents (total visual) a la altura
+
+            // Fondo tenue verde para el área "afinada"
+            canvasCtx.fillStyle = 'rgba(16, 185, 129, 0.1)'; // Verde 500 con transparencia
+            canvasCtx.fillRect(0, center - (rangeY * pixelsPerCent), WIDTH, rangeY * pixelsPerCent * 2);
+
+            if (isPlaying) {
+                // Mapear los 100 cents (de -50 a +50) a la altura del canvas
+                let drawCents = Math.min(Math.max(cents, -50), 50); // Limitar a +/- 50 cents
+                // El centro (0 cents) es HEIGHT/2. Menos cents es abajo (frecuencia baja), más cents es arriba.
+                let dotY = center - (drawCents * pixelsPerCent);
+
+                let color;
+                const absCents = Math.abs(drawCents);
+
+                if (absCents <= ACCURACY_THRESHOLD) { 
+                    color = '#10b981'; // Verde
+                } else if (absCents <= 30) { 
+                    color = '#f59e0b'; // Amarillo
+                } else { 
+                    color = '#ef4444'; // Rojo
+                }
+
+                // Dibujar el punto de tono detectado (que es la voz del usuario)
+                canvasCtx.fillStyle = color;
+                canvasCtx.shadowColor = color;
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.beginPath();
+                canvasCtx.arc(WIDTH / 2, dotY, 10, 0, 2 * Math.PI);
+                canvasCtx.fill();
+                canvasCtx.shadowBlur = 0; 
+                
+            } else {
+                // Silencio o sin detección clara
+                canvasCtx.fillStyle = '#6b7280'; // Gris
+                canvasCtx.font = '20px Arial';
+                canvasCtx.fillText('Canta aquí', WIDTH / 2 - 40, center + 7);
+            }
+        }
+
+        // --- Bucle Principal ---
+        
+        function tick() {
+            if (!analyser || !dataArray) {
+                pitchDetectionInterval = requestAnimationFrame(tick);
+                return;
+            }
+
+            analyser.getFloatTimeDomainData(dataArray);
+            const sampleRate = audioContext.sampleRate;
+            
+            const targetFreq = updateTargetNote();
+            let detectedFreq = getFundamentalFreq(dataArray, sampleRate);
+            let cents = 0;
+            let isPlaying = false;
+
+            if (detectedFreq > 0) {
+                isPlaying = true;
+                
+                // Encontrar la desviación de la frecuencia detectada a la nota objetivo actual
+                cents = centsOff(detectedFreq, targetFreq);
+                
+                // Actualizar UI
+                const midiNote = freqToMidi(detectedFreq);
+                const noteIndex = Math.round(midiNote) % 12;
+                const octave = Math.floor(midiNote / 12) - 1;
+                detectedNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
+                frequencyDisplay.textContent = `${detectedFreq.toFixed(2)} Hz`;
+
+                // Actualizar Progreso
+                updateProgress(cents);
+
+            } else {
+                // Silencio
+                detectedNoteDisplay.textContent = '---';
+                frequencyDisplay.textContent = '0.0 Hz';
+                // El progreso decae suavemente
+                updateProgress(100); 
+            }
+
+            // Dibujar Canvas
+            drawPitchVisual(cents, isPlaying);
+            
+            pitchDetectionInterval = requestAnimationFrame(tick);
+        }
+
+        // --- Inicialización y Event Handlers ---
+
+        function handleVoiceRangeChange(event) {
+            const range = event.target.value;
+            if (range === 'low') {
+                targetMidiOffset = -12; // Transponer una octava abajo (e.g., C4 -> C3)
+            } else {
+                targetMidiOffset = 0; // Dejar en el rango C4
+            }
+            // Resetear y actualizar la nota objetivo
+            currentTargetIndex = 0;
+            userProgress = 0;
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            updateTargetNote();
+        }
+
+        voiceRangeInputs.forEach(input => {
+            input.addEventListener('change', handleVoiceRangeChange);
+        });
+
+        /**
+         * Inicia el acceso al micrófono y el bucle de afinación.
+         */
+        async function startTuner() {
+            startTunerButton.disabled = true;
+            statusMessage.textContent = 'Solicitando acceso al micrófono...';
+
+            try {
+                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048; 
+                dataArray = new Float32Array(analyser.fftSize);
+
+                source.connect(analyser);
+
+                statusMessage.textContent = 'Micrófono activo. ¡Canta para empezar el ejercicio!';
+                startTunerButton.textContent = 'Afinador Activo';
+                startTunerButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                startTunerButton.classList.add('bg-emerald-600');
+                
+                // Inicializar la primera nota objetivo basada en la selección
+                updateTargetNote();
+
+                // Iniciar el bucle de detección de tono
+                tick(); 
+
+            } catch (err) {
+                console.error("Error al acceder al micrófono:", err);
+                statusMessage.textContent = 'Error: No se pudo acceder al micrófono. (Puede que necesites recargar y dar permiso)';
+                statusMessage.classList.remove('text-yellow-400');
+                statusMessage.classList.add('text-red-500');
+                startTunerButton.disabled = false;
+                startTunerButton.textContent = 'Reintentar';
+            }
+        }
+
+        startTunerButton.addEventListener('click', startTuner);
+        
+        // Inicializar el rango de voz al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTargetNote();
+        });
+
+    </script>
+</body>
+</html>
