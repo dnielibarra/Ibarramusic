@@ -41,7 +41,7 @@
 <body class="bg-gray-900 text-white flex items-center justify-center h-full font-sans p-4">
 
     <div class="w-full max-w-sm text-center">
-        <h1 class="text-4xl font-bold mb-8">Afinador Cromático</h1>
+        <h1 class="text-4xl font-bold mb-8 text-blue-400">Afinador Cromático 2.0</h1>
 
         <!-- Contenedor del medidor visual -->
         <div id="meter-container" class="relative w-full h-40 bg-gray-800 rounded-lg overflow-hidden mb-6 p-4 border border-gray-700">
@@ -58,12 +58,13 @@
 
         <!-- Pantalla de la nota -->
         <div class="mb-8">
+            <!-- Aquí se muestra la nota con su octava (ej: E4) -->
             <div id="note-display" class="text-8xl font-bold text-gray-400">--</div>
             <div id="detune-display" class="text-2xl text-gray-500">Toca una cuerda</div>
         </div>
 
         <!-- Botón de inicio -->
-        <button id="startButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all">
+        <button id="startButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all shadow-lg hover:shadow-xl">
             Comenzar
         </button>
 
@@ -72,14 +73,14 @@
 
         <!-- Notas de referencia (para el usuario) -->
         <div class="mt-8 text-gray-500">
-            <p class="text-lg mb-2">Afinación Estándar (EADGBe)</p>
-            <div class="flex justify-center space-x-4">
-                <span>E (6ª)</span>
-                <span>A (5ª)</span>
-                <span>D (4ª)</span>
-                <span>G (3ª)</span>
-                <span>B (2ª)</span>
-                <span>e (1ª)</span>
+            <p class="text-lg mb-2">Afinación Estándar de Guitarra (E A D G B e)</p>
+            <div class="flex justify-center space-x-2 text-sm md:text-base">
+                <span class="font-bold text-gray-300">E2</span>
+                <span class="font-bold text-gray-300">A2</span>
+                <span class="font-bold text-gray-300">D3</span>
+                <span class="font-bold text-gray-300">G3</span>
+                <span class="font-bold text-gray-300">B3</span>
+                <span class="font-bold text-gray-300">E4</span>
             </div>
         </div>
     </div>
@@ -99,7 +100,7 @@
         let bufferLength;
         let dataArray;
 
-        // Nombres de las notas
+        // Nombres de las notas (índice 0 = C, 1 = C#, etc.)
         const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
         // Estado
@@ -128,7 +129,8 @@
                     // Configurar el analizador
                     analyser.fftSize = 4096; // Alta resolución para bajas frecuencias
                     bufferLength = analyser.frequencyBinCount;
-                    dataArray = new Float32Array(analyser.fftSize); // Usar Float32Array para TimeDomainData
+                    // Usar Float32Array para almacenar los datos de dominio de tiempo
+                    dataArray = new Float32Array(analyser.fftSize); 
                     
                     // Conectar los nodos
                     mediaStreamSource.connect(analyser);
@@ -136,6 +138,9 @@
                     // Iniciar el bucle de detección
                     isRunning = true;
                     startButton.textContent = 'Detener';
+                    // Cambiar el estilo del botón
+                    startButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    startButton.classList.add('bg-red-600', 'hover:bg-red-700');
                     errorMessage.classList.add('hidden');
                     detectPitch();
                 })
@@ -143,6 +148,9 @@
                     console.error('Error al obtener el micrófono:', err);
                     errorMessage.textContent = 'Error: No se pudo acceder al micrófono. Asegúrate de dar permiso.';
                     errorMessage.classList.remove('hidden');
+                    // Restaurar botón si hay error
+                    startButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    startButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 });
         }
 
@@ -150,6 +158,7 @@
             if (rafID) {
                 cancelAnimationFrame(rafID);
             }
+            // Detener todas las pistas de audio (micrófono)
             if (mediaStreamSource && mediaStreamSource.mediaStream.getTracks) {
                 mediaStreamSource.mediaStream.getTracks().forEach(track => track.stop());
             }
@@ -159,7 +168,15 @@
             
             isRunning = false;
             startButton.textContent = 'Comenzar';
+            // Restaurar estilo del botón
+            startButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+            startButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
             noteDisplay.textContent = '--';
+            // Restablecer el color de la nota
+            noteDisplay.classList.remove('text-green-400', 'text-red-500');
+            noteDisplay.classList.add('text-gray-400');
+
             detuneDisplay.textContent = 'Toca una cuerda';
             updateMeter(0);
         }
@@ -177,6 +194,9 @@
             } else {
                 // Silencio o ruido no identificable
                 noteDisplay.textContent = '--';
+                // Restablecer el color de la nota
+                noteDisplay.classList.remove('text-green-400', 'text-red-500');
+                noteDisplay.classList.add('text-gray-400');
                 detuneDisplay.textContent = 'Toca una cuerda';
                 updateMeter(0);
             }
@@ -186,9 +206,10 @@
         }
 
         function updateUI(noteData) {
-            const { noteName, detune } = noteData;
+            const { noteNameWithOctave, detune } = noteData;
             
-            noteDisplay.textContent = noteName;
+            // Mostrar la nota con la octava (ej: E4)
+            noteDisplay.textContent = noteNameWithOctave;
             
             if (Math.abs(detune) < 5) { // Rango "en tono" (5 cents)
                 detuneDisplay.textContent = 'En Tono';
@@ -224,18 +245,27 @@
         }
 
         function getNoteData(frequency) {
+            // A4 = 440Hz, MIDI note 69
             // Fórmula para convertir frecuencia a número de nota MIDI
             const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2)) + 69;
             const nearestNote = Math.round(noteNum);
             
+            // Calcular la octava (basado en C4 = MIDI 60, entonces 69 (A4) - 60 = 9)
+            // La octava es Floor(NotaMIDI / 12) - 1. (Ej: 69/12 = 5.75, Floor(5.75) - 1 = 4)
+            const octave = Math.floor(nearestNote / 12) - 1; 
+
+            // Nombre de la nota (sin octava)
             const noteName = noteStrings[nearestNote % 12];
+            
+            // Nombre de la nota con octava
+            const noteNameWithOctave = noteName + octave;
             
             // Calcular la diferencia en cents
             // cents = 1200 * log2(f2 / f1)
             const expectedFrequency = 440 * Math.pow(2, (nearestNote - 69) / 12);
             const detune = 1200 * Math.log2(frequency / expectedFrequency);
             
-            return { noteName, detune };
+            return { noteNameWithOctave, detune };
         }
 
         // --- Algoritmo de Autocorrelación ---
@@ -254,8 +284,8 @@
             }
 
             // 2. Encontrar el rango de búsqueda (basado en frecuencias de guitarra)
-            const minFreq = 70; // E2 (approx 82Hz, damos margen)
-            const maxFreq = 700; // E5 (approx 659Hz, damos margen)
+            const minFreq = 60; 
+            const maxFreq = 1500; 
             const minSamples = Math.floor(sampleRate / maxFreq);
             const maxSamples = Math.floor(sampleRate / minFreq);
 
@@ -275,6 +305,10 @@
                 for (let i = 0; i < buffer.length - offset; i++) {
                     sum += buffer[i] * buffer[i] + buffer[i+offset] * buffer[i+offset];
                 }
+                
+                // Evitar división por cero
+                if (sum === 0) continue; 
+
                 correlations[offset] = (2 * correlation) / sum;
                 
                 if (correlations[offset] > bestCorrelation) {
@@ -286,12 +320,17 @@
             if (bestCorrelation > 0.9) { // Umbral de confianza (ajustar si es necesario)
                 // 4. Interpolación cuadrática para una mejor precisión
                 // (Encontrar el pico exacto entre muestras)
-                const d1 = correlations[bestOffset - 1];
-                const d2 = correlations[bestOffset];
-                const d3 = correlations[bestOffset + 1];
-                const shift = (d1 - d3) / (2 * (2 * d2 - d1 - d3));
-                
-                return sampleRate / (bestOffset + shift);
+                // Asegurarse de que los índices son válidos
+                if (bestOffset > minSamples && bestOffset < maxSamples - 1) {
+                    const d1 = correlations[bestOffset - 1];
+                    const d2 = correlations[bestOffset];
+                    const d3 = correlations[bestOffset + 1];
+                    const shift = (d1 - d3) / (2 * (2 * d2 - d1 - d3));
+                    
+                    return sampleRate / (bestOffset + shift);
+                } else {
+                    return sampleRate / bestOffset;
+                }
             }
 
             return -1; // No se encontró un tono claro
