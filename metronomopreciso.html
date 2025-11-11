@@ -38,7 +38,7 @@
 <body class="bg-gray-900 text-white flex items-center justify-center h-full font-sans p-4">
 
     <div class="w-full max-w-lg text-center bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
-        <h1 class="text-4xl font-extrabold mb-6 text-blue-400">Metrónomo Preciso V1.5</h1>
+        <h1 class="text-4xl font-extrabold mb-6 text-blue-400">Metrónomo Preciso</h1>
 
         <!-- Puntos Dinámicos de Beats -->
         <div class="mb-10 p-4">
@@ -210,7 +210,7 @@
             // Mientras haya notas que deban ser programadas en el futuro cercano...
             while (nextNoteTime < audioContext.currentTime + scheduleAheadTime) {
                 
-                // 1. Avanzar el beat (2, 3, 4, 1, 2, 3...)
+                // 1. Avanzar el beat (0->1, 1->2, 2->3, 3->4, 4->1...)
                 nextBeat(); 
 
                 // 2. Programar la nota actual (YA con el beat correcto)
@@ -265,25 +265,19 @@
                 });
             }
 
-            // --- INICIALIZACIÓN CRÍTICA PARA EL BEAT 1 ---
-            currentBeat = 1; // Comenzamos inmediatamente en Beat 1 (No en 0)
-            const secondsPerBeat = 60.0 / tempo;
+            // --- CORRECCIÓN FINAL PARA EVITAR SALTO DEL BEAT 1 ---
+            currentBeat = 0; // Inicia en 0 para que la primera llamada a nextBeat lo ponga en 1.
             
-            // 1. Programar el primer beat de forma inmediata (acento y luz)
-            // Se usa audioContext.currentTime para que ocurra al instante.
-            scheduleNote(1, audioContext.currentTime);
-
-            // 2. Establecer el tiempo de la próxima nota (Beat 2)
-            nextNoteTime = audioContext.currentTime + secondsPerBeat;
+            // Programamos el primer beat 50ms en el futuro (tiempo suficiente para "despertar" el sistema)
+            nextNoteTime = audioContext.currentTime + 0.05; 
             
-            // Iniciar el programador (esto programará Beat 2 en adelante)
+            // Iniciar el programador (la primera ejecución de scheduler programará el Beat 1 en nextNoteTime)
             isRunning = true;
             startStopButton.textContent = 'Detener';
             startStopButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
             startStopButton.classList.add('bg-red-600', 'hover:bg-red-700');
             document.getElementById('error-message').classList.add('hidden');
             
-            // La función 'scheduler' se encargará del Beat 2 en adelante
             timerID = setTimeout(scheduler, lookahead);
         }
 
@@ -315,4 +309,3 @@
     </script>
 </body>
 </html>
-
