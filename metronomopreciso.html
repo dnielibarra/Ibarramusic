@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metrónomo Web</title>
+    <title>Metrónomo Web V1.5</title>
     <!-- Cargar Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -122,7 +122,7 @@
              const dots = beatDotsContainer.querySelectorAll('.beat-dot');
              dots.forEach(dot => {
                 dot.classList.remove('dot-strong-beat', 'dot-weak-beat');
-                // Se ha eliminado scale-130 y scale-110 para usar el mismo CSS de Tailwind.
+                dot.classList.remove('scale-130', 'scale-110');
              });
         }
 
@@ -144,7 +144,7 @@
         timeSignatureSelect.addEventListener('change', (e) => {
             const [beats, value] = e.target.value.split('/');
             beatsPerMeasure = parseInt(beats);
-            currentBeat = 0; 
+            currentBeat = 0; // Reiniciar el contador de beat
             
             renderDots(); // Rerenderiza la cantidad correcta de puntos
             
@@ -206,24 +206,23 @@
             }, delayInMs);
         }
 
-        // CÓDIGO CORRECTO:
-function scheduler() {
-    // Mientras haya notas que deban ser programadas en el futuro cercano...
-    while (nextNoteTime < audioContext.currentTime + scheduleAheadTime) {
-        
-        // 1. *** CORRECCIÓN: Avanzar el beat ANTES de programar ***
-        nextBeat(); // Incrementa currentBeat: 0 -> 1, 1 -> 2, etc.
+        function scheduler() {
+            // Mientras haya notas que deban ser programadas en el futuro cercano...
+            while (nextNoteTime < audioContext.currentTime + scheduleAheadTime) {
+                
+                // 1. Avanzar el beat (2, 3, 4, 1, 2, 3...)
+                nextBeat(); 
 
-        // 2. Programar la nota actual (YA con el beat correcto: 1, 2, 3...)
-        scheduleNote(currentBeat, nextNoteTime);
-        
-        // 3. Avanzar el tiempo para la próxima nota
-        const secondsPerBeat = 60.0 / tempo;
-        nextNoteTime += secondsPerBeat;
-    }
-    // Llamar de nuevo al scheduler
-    timerID = setTimeout(scheduler, lookahead);
-}
+                // 2. Programar la nota actual (YA con el beat correcto)
+                scheduleNote(currentBeat, nextNoteTime);
+                
+                // 3. Avanzar el tiempo para la próxima nota
+                const secondsPerBeat = 60.0 / tempo;
+                nextNoteTime += secondsPerBeat;
+            }
+            // Llamar de nuevo al scheduler
+            timerID = setTimeout(scheduler, lookahead);
+        }
 
         function updateVisuals(beat, isStrong) {
             resetDotsVisuals();
@@ -266,18 +265,26 @@ function scheduler() {
                 });
             }
 
-            // Iniciar el ciclo de beats
-            currentBeat = 0; // Se incrementará a 1 en la primera llamada a nextBeat()
-            nextNoteTime = audioContext.currentTime;
+            // --- INICIALIZACIÓN CRÍTICA PARA EL BEAT 1 ---
+            currentBeat = 1; // Comenzamos inmediatamente en Beat 1 (No en 0)
+            const secondsPerBeat = 60.0 / tempo;
             
-            // Iniciar el programador
+            // 1. Programar el primer beat de forma inmediata (acento y luz)
+            // Se usa audioContext.currentTime para que ocurra al instante.
+            scheduleNote(1, audioContext.currentTime);
+
+            // 2. Establecer el tiempo de la próxima nota (Beat 2)
+            nextNoteTime = audioContext.currentTime + secondsPerBeat;
+            
+            // Iniciar el programador (esto programará Beat 2 en adelante)
             isRunning = true;
             startStopButton.textContent = 'Detener';
             startStopButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
             startStopButton.classList.add('bg-red-600', 'hover:bg-red-700');
             document.getElementById('error-message').classList.add('hidden');
             
-            scheduler();
+            // La función 'scheduler' se encargará del Beat 2 en adelante
+            timerID = setTimeout(scheduler, lookahead);
         }
 
         function stopMetronome() {
