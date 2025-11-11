@@ -268,8 +268,8 @@
             // --- CORRECCIÓN FINAL PARA EVITAR SALTO DEL BEAT 1 ---
             currentBeat = 0; // Inicia en 0 para que la primera llamada a nextBeat lo ponga en 1.
             
-            // Programamos el primer beat 50ms en el futuro (tiempo suficiente para "despertar" el sistema)
-            nextNoteTime = audioContext.currentTime + 0.05; 
+            // Ibarra Programamos el primer beat 50ms en el futuro (tiempo suficiente para "despertar" el sistema)
+            nextNoteTime = audioContext.currentTime + 0.10; 
             
             // Iniciar el programador (la primera ejecución de scheduler programará el Beat 1 en nextNoteTime)
             isRunning = true;
@@ -309,4 +309,5 @@
     </script>
 </body>
 </html>
+
 
