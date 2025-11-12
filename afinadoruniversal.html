@@ -3,36 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Entrenador Vocal Estable V3</title>
+    <title>Afinador Universal Estable (Guitarra y Ukelele)</title>
     <!-- Cargar Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Cargar Tone.js para la generación de sonido guía -->
-    <script src="https://unpkg.com/tone@14.7.58/build/Tone.js"></script>
-    
     <style>
-        /* Estilos base */
-        .vocal-trainer-container {
+        /* Configuración de fuente y contenedores */
+        .tuner-container {
             background-color: #1f2937; /* Gray 800 */
             border-radius: 16px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
             border: 1px solid #374151;
-            max-width: 480px; /* Tamaño máximo para centrar en escritorio */
+            max-width: 500px; 
+            min-height: 500px;
         }
-        #pitch-canvas {
-            background-color: #f7f7f7; /* Fondo de pentagrama blanco/claro */
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
-            width: 100%; 
-            height: 150px; 
+        
+        /* Estilo para el medidor de cents (aguja) */
+        #meter-needle {
+            transform-origin: 50% 100%;
+            transition: transform 0.1s ease-out; /* Suaviza el movimiento */
         }
-        /* Estilo para el input de radio */
-        input[type="radio"]:checked + label {
-            background-color: #059669; 
-            color: white;
-            border-color: #10b981;
-            box-shadow: 0 0 10px rgba(5, 150, 105, 0.5);
+
+        /* Colores del dial */
+        .meter-line {
+            stroke: #4b5563; /* Gris */
         }
+        .meter-center {
+            stroke: #10b981; /* Verde esmeralda (Afinado) */
+        }
+        .meter-sides {
+            stroke: #f59e0b; /* Amarillo (Cerca) */
+        }
+        .meter-far {
+            stroke: #ef4444; /* Rojo (Lejos) */
+        }
+
+        /* Animación de estado del micrófono */
         .mic-status-off {
              animation: pulse-red 1s infinite;
         }
@@ -47,133 +52,162 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
             50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
         }
+
+        /* Estilo para los botones de cuerda/instrumento */
+        .tuning-btn {
+            @apply p-2 sm:p-3 rounded-xl font-bold transition-all duration-200 shadow-lg text-sm sm:text-lg;
+            background-color: #374151; /* Gray 700 */
+            color: #d1d5db; /* Gray 300 */
+        }
+        .tuning-btn.selected {
+            background-color: #059669; /* Emerald 600 */
+            color: white;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.6);
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-full font-sans p-2 sm:p-4">
 
-    <div class="w-full vocal-trainer-container p-6 sm:p-8">
-        <h1 class="text-2xl sm:text-3xl font-extrabold mb-1 text-emerald-400">🎤 Entrenador Vocal Dinámico V3</h1>
-        <p class="text-gray-400 mb-4 text-sm">Afinación con sonido guía y visualización de tu voz en tiempo real.</p>
+    <div class="w-full tuner-container p-6 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-extrabold mb-1 text-emerald-400 text-center">Tuner Universal 🎸🇺🇦</h1>
+        <p class="text-gray-400 mb-4 text-sm text-center">Guitarra y Ukelele. Afinación más estable.</p>
 
-        <!-- Selección de Rango Vocal -->
-        <div class="mb-4 flex justify-center space-x-3">
-            <input type="radio" id="voice-low" name="voice-range" value="-12" class="hidden" checked>
-            <label for="voice-low" class="flex-1 px-3 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600 text-sm">Voz Baja (C3-G3)</label>
-            
-            <input type="radio" id="voice-high" name="voice-range" value="0" class="hidden">
-            <label for="voice-high" class="flex-1 px-3 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600 text-sm">Voz Alta (C4-G4)</label>
+        <!-- Selección de Instrumento -->
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="select-guitar" class="tuning-btn selected">Guitarra</button>
+            <button id="select-ukulele" class="tuning-btn">Ukelele</button>
         </div>
 
         <!-- Botón de Inicio y Controles -->
-        <button id="start-tuner-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-lg transition-all shadow-lg mb-2 disabled:bg-gray-600">
-            Iniciar Micrófono y Tono Guía
-        </button>
-        <div class="flex items-center justify-between mb-4">
-            <div id="mic-status-light" class="w-4 h-4 rounded-full bg-red-500 mic-status-off transition-all"></div>
-            <p id="status-message" class="text-sm font-semibold h-4 text-yellow-400 text-left flex-1 ml-2">Pulsa para iniciar el audio...</p>
-            <button id="play-tone-button" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded-full text-xs transition-colors shadow-md disabled:opacity-50" disabled>
-                Escuchar Tono
+        <div class="flex flex-col items-center mb-6">
+            <button id="start-tuner-button" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-lg transition-all shadow-xl disabled:bg-gray-600 mb-3">
+                Iniciar Micrófono
             </button>
+            <div class="flex items-center">
+                <div id="mic-status-light" class="w-4 h-4 rounded-full bg-red-500 mic-status-off transition-all"></div>
+                <p id="status-message" class="text-xs font-semibold ml-2 text-yellow-400">Pulsa para iniciar la detección de tono...</p>
+            </div>
         </div>
 
-        <!-- Contenedor de Pentagrama y Notas -->
-        <div class="relative">
-            <canvas id="pitch-canvas" height="150"></canvas>
+        <!-- Visualizador de Cents (Dial) -->
+        <div class="flex flex-col items-center">
+            <div id="note-display" class="text-6xl sm:text-8xl font-extrabold mb-2 text-white transition-colors duration-300">E2</div>
+            <div id="frequency-display" class="text-xl text-gray-400 mb-4">--- Hz</div>
             
-            <!-- Display de Nota y Frecuencia -->
-            <div class="flex justify-between items-center px-2">
-                <div>
-                    <p class="text-sm text-gray-400">Nota Objetivo</p>
-                    <div id="target-note" class="text-3xl font-extrabold text-yellow-300">C3</div>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs text-gray-500" id="frequency-display">0.0 Hz</p>
-                    <div id="detected-note" class="text-xl font-extrabold text-white">---</div>
-                    <p class="text-sm text-gray-400">Tu Voz Detectada</p>
-                </div>
-            </div>
+            <svg id="tuner-meter" width="300" height="180" viewBox="0 0 300 180" class="w-full max-w-sm">
+                <!-- Arcos del dial -->
+                <path d="M 50 150 A 100 100 0 0 1 250 150" fill="none" class="meter-line" stroke-width="20" stroke-linecap="round"/>
+                
+                <!-- Centro (Verde - Afinado) -->
+                <path d="M 125 150 A 100 100 0 0 1 175 150" fill="none" class="meter-center" stroke-width="20" stroke-linecap="butt"/>
+                
+                <!-- Lados (Amarillo - Cerca) -->
+                <path d="M 85 150 A 100 100 0 0 1 125 150" fill="none" class="meter-sides" stroke-width="20" stroke-linecap="butt"/>
+                <path d="M 175 150 A 100 100 0 0 1 215 150" fill="none" class="meter-sides" stroke-width="20" stroke-linecap="butt"/>
+
+                <!-- Puntos de referencia -->
+                <circle cx="150" cy="150" r="5" fill="#ffffff"/>
+                <circle cx="100" cy="150" r="3" fill="#ffffff"/>
+                <circle cx="200" cy="150" r="3" fill="#ffffff"/>
+                <circle cx="65" cy="150" r="3" fill="#ffffff"/>
+                <circle cx="235" cy="150" r="3" fill="#ffffff"/>
+
+                <!-- Etiquetas de Cents -->
+                <text x="55" y="165" fill="#d1d5db" font-size="12" text-anchor="middle">-50</text>
+                <text x="245" y="165" fill="#d1d5db" font-size="12" text-anchor="middle">+50</text>
+                
+                <!-- Aguja (Pivota desde (150, 150)) -->
+                <line id="meter-needle" x1="150" y1="150" x2="150" y2="50" stroke="#fefefe" stroke-width="4" stroke-linecap="round"/>
+            </svg>
         </div>
 
-        <!-- Barra de Progreso Motivacional -->
-        <div class="mt-6">
-            <p class="text-md font-semibold text-emerald-400 mb-2">Estabilidad de Afinación:</p>
-            <div class="w-full bg-gray-600 rounded-full h-8 overflow-hidden shadow-inner">
-                <div id="progress-bar" class="h-8 bg-emerald-500 transition-all duration-300 ease-out flex items-center justify-center text-sm font-bold text-gray-900" style="width: 0%">
-                    0%
-                </div>
-            </div>
+        <!-- Botones de Cuerdas Dinámicos -->
+        <div id="string-buttons-container" class="flex justify-center space-x-2 mt-4 flex-wrap gap-y-2">
+            <!-- Los botones se insertarán aquí por JavaScript -->
         </div>
+
     </div>
 
     <script>
-        // --- Constantes Musicales y Tareas ---
+        // --- Constantes Musicales y Afinaciones ---
         const A4_FREQ = 440; 
         const MIDI_A4 = 69;
-        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         
-        // Escala ascendente de 5 notas: C, D, E, F, G (MIDI 60, 62, 64, 65, 67)
-        const TARGET_MIDI_SCALE_C4 = [60, 62, 64, 65, 67]; 
-        
-        let currentTargetIndex = 0;
-        let targetMidiOffset = -12; // Inicia en C3 (Voz Baja)
-        let isTunerRunning = false;
+        // Afinaciones (MIDI en orden de la cuerda más grave a la más aguda)
+        const TUNINGS = {
+            'guitar': {
+                name: 'Guitarra',
+                notes: [40, 45, 50, 55, 59, 64], // E2, A2, D3, G3, B3, E4
+                names: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4']
+            },
+            'ukulele': {
+                name: 'Ukelele (GCEA)',
+                notes: [67, 60, 64, 69], // G4, C4, E4, A4 (G-c-e-a)
+                names: ['G4', 'C4', 'E4', 'A4']
+            }
+        };
 
         // --- Configuración de Audio y Detección ---
         let audioContext = null;
         let analyser = null;
         let dataArray = null;
-        let synth = null; 
         let mediaStream = null;
+        let animationFrameId = null;
 
-        // --- Variables de Estado y Progreso ---
-        let userProgress = 0; 
-        const ACCURACY_THRESHOLD = 10; // +/- 10 cents (décimas de semitono)
-        const PROGRESS_RATE = 0.5; 
-        const DECAY_RATE = 0.15; 
+        // --- Variables de Estado del Afinador ---
+        let isTunerRunning = false;
+        let currentInstrument = 'guitar'; 
+        let currentStringIndex = 0;
 
-        // --- Referencias DOM y Canvas ---
+        // Estabilidad y Precisión
+        const ACCURACY_THRESHOLD = 8; // +/- 8 cents (para el color verde)
+        // ** VALORES AJUSTADOS PARA MAYOR ESTABILIDAD (STICKINESS) **
+        const PROGRESS_RATE_STICKY = 3.0; // Velocidad de aumento (hace que el verde se "pegue")
+        const DECAY_RATE = 0.3; // Velocidad de disminución
+
+        // Estado interno para el progreso de afinación
+        let greenPersistence = 0; // 0 a 100
+
+        // --- Referencias DOM ---
         const statusMessage = document.getElementById('status-message');
         const startTunerButton = document.getElementById('start-tuner-button');
-        const playToneButton = document.getElementById('play-tone-button');
-        const detectedNoteDisplay = document.getElementById('detected-note');
-        const targetNoteDisplay = document.getElementById('target-note');
+        const noteDisplay = document.getElementById('note-display');
         const frequencyDisplay = document.getElementById('frequency-display');
-        const progressBar = document.getElementById('progress-bar');
-        const voiceRangeInputs = document.querySelectorAll('input[name="voice-range"]');
         const micStatusLight = document.getElementById('mic-status-light');
-        const canvas = document.getElementById('pitch-canvas');
-        const canvasCtx = canvas.getContext('2d');
-        let WIDTH = canvas.width;
-        let HEIGHT = canvas.height;
+        const stringButtonsContainer = document.getElementById('string-buttons-container');
+        const meterNeedle = document.getElementById('meter-needle');
 
         // --- Utilidades Musicales ---
+
+        /** Convierte frecuencia a nota MIDI */
         function freqToMidi(freq) { return MIDI_A4 + (12 * Math.log2(freq / A4_FREQ)); }
-        function midiToFreq(midi) { return A4_FREQ * Math.pow(2, (midi - MIDI_A4) / 12); }
-        function centsOff(freq, targetFreq) { return 1200 * Math.log2(freq / targetFreq); }
         
-        /** Convierte MIDI a string de nota (Ej: 60 -> C4) */
-        function midiToNoteString(midi) {
-            const noteIndex = midi % 12;
-            const octave = Math.floor(midi / 12) - 1;
-            return NOTE_NAMES[noteIndex] + octave;
-        }
+        /** Convierte MIDI a frecuencia */
+        function midiToFreq(midi) { return A4_FREQ * Math.pow(2, (midi - MIDI_A4) / 12); }
+        
+        /** Calcula la desviación en cents */
+        function centsOff(freq, targetFreq) { return 1200 * Math.log2(freq / targetFreq); }
 
         /**
-         * Detección de tono por Autocorrelación simplificada.
+         * Detección de tono usando Autocorrelación simplificada.
+         * (Optimizado para funcionar bien en el rango de guitarra/ukelele)
          */
         function getFundamentalFreq(buffer, sampleRate) {
-            // Implementación de Autocorrelación (mismo código que V2)
             const size = buffer.length;
-            const threshold = 0.01; 
+            const threshold = 0.05; 
             let startIndex = 0;
 
+            // Encontrar el primer punto de amplitud suficiente
             for (let i = 0; i < size; i++) {
                 if (Math.abs(buffer[i]) > threshold) { startIndex = i; break; }
             }
-            if (startIndex === 0) return 0;
+            if (startIndex === 0 || size - startIndex < 100) return 0; // Silencio o señal muy débil
 
             let maxCorr = -1;
             let bestPeriod = -1;
+            
+            // Rango de frecuencias de 50 Hz (E1/Ukulele grave) a 1200 Hz (Armónico alto)
             const minPeriod = sampleRate / 1200; 
             const maxPeriod = sampleRate / 50; 
 
@@ -182,7 +216,7 @@
                 for (let i = startIndex; i < size - tau; i++) {
                     correlation += buffer[i] * buffer[i + tau];
                 }
-                let normalizedCorr = correlation / size;
+                let normalizedCorr = correlation / (size - tau); // Normalización mejorada
 
                 if (normalizedCorr > maxCorr) {
                     maxCorr = normalizedCorr;
@@ -190,260 +224,163 @@
                 }
             }
             
-            if (bestPeriod > 0 && maxCorr > 0.01) { 
+            // Usamos un umbral de correlación más alto para evitar ruido
+            if (bestPeriod > 0 && maxCorr > 0.1) { 
                 return sampleRate / bestPeriod;
             }
             return 0; 
         }
-
-        // --- Lógica del Ejercicio y Progreso ---
         
-        function getCurrentTargetNote() {
-            const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
+        // --- Lógica de la Interfaz ---
+
+        function getTarget() {
+            const notes = TUNINGS[currentInstrument].notes;
+            const names = TUNINGS[currentInstrument].names;
+            const midi = notes[currentStringIndex];
+            
             return {
-                midi: targetMidi,
-                freq: midiToFreq(targetMidi),
-                name: midiToNoteString(targetMidi)
+                midi: midi,
+                freq: midiToFreq(midi),
+                name: names[currentStringIndex]
             };
         }
 
-        function playTargetNote() {
-            const target = getCurrentTargetNote();
-            if (synth) {
-                 // Usa el nombre de la nota calculado
-                synth.triggerAttackRelease(target.name, '1n'); 
-                console.log(`Reproduciendo nota guía: ${target.name}`);
-            }
+        function updateStringButtons() {
+            stringButtonsContainer.innerHTML = '';
+            const tuning = TUNINGS[currentInstrument];
+            
+            tuning.names.forEach((name, index) => {
+                const button = document.createElement('button');
+                button.textContent = name;
+                button.classList.add('tuning-btn');
+                
+                if (index === currentStringIndex) {
+                    button.classList.add('selected');
+                }
+                
+                button.dataset.index = index;
+                button.onclick = () => {
+                    currentStringIndex = index;
+                    // Resetear la persistencia al cambiar de cuerda para evitar confusión
+                    greenPersistence = 0; 
+                    updateDisplay(0, 0, false); 
+                    updateStringButtons(); 
+                };
+                stringButtonsContainer.appendChild(button);
+            });
+
+            // Actualizar la nota objetivo principal
+            noteDisplay.textContent = tuning.names[currentStringIndex];
+            noteDisplay.classList.add('text-white');
+            noteDisplay.classList.remove('text-emerald-400', 'text-yellow-400', 'text-red-400');
         }
 
-        function updateTargetUI() {
-            const target = getCurrentTargetNote();
-            targetNoteDisplay.textContent = target.name;
-        }
-        
-        function updateProgress(cents, isAccurate) {
+        function updateDisplay(cents, detectedFreq, isPlaying) {
+            // 1. Actualizar Frecuencia
+            frequencyDisplay.textContent = isPlaying ? `${detectedFreq.toFixed(2)} Hz` : '--- Hz';
+
+            // 2. Lógica de Persistencia (Stickiness)
+            let isAccurate = isPlaying && Math.abs(cents) <= ACCURACY_THRESHOLD;
             
             if (isAccurate) {
-                userProgress += PROGRESS_RATE;
-                progressBar.classList.remove('bg-yellow-500', 'bg-red-500', 'text-white');
-                progressBar.classList.add('bg-emerald-500', 'text-gray-900');
-            } else if (Math.abs(cents) <= 30) {
-                userProgress += PROGRESS_RATE / 5;
-                progressBar.classList.remove('bg-emerald-500', 'bg-red-500', 'text-gray-900');
-                progressBar.classList.add('bg-yellow-500', 'text-white');
+                // Aumenta la persistencia rápidamente si está afinado
+                greenPersistence = Math.min(100, greenPersistence + PROGRESS_RATE_STICKY);
+            } else if (isPlaying) {
+                 // Disminuye lentamente si está cantando, pero fuera del rango 'pegado'
+                greenPersistence = Math.max(0, greenPersistence - DECAY_RATE);
             } else {
-                userProgress -= DECAY_RATE;
-                progressBar.classList.remove('bg-emerald-500', 'bg-yellow-500', 'text-gray-900');
-                progressBar.classList.add('bg-red-500', 'text-white');
+                 // Disminuye más rápido si hay silencio o no hay detección (para que vuelva a empezar)
+                greenPersistence = Math.max(0, greenPersistence - (DECAY_RATE * 1.5));
+            }
+            
+            const isGreenSticky = greenPersistence > 50; 
+
+            // 3. Ajustar la Aguja (Needle)
+            // Clamp a +/- 50 cents para la visualización del dial
+            const clampedCents = Math.min(Math.max(cents, -50), 50); 
+            // Rango de rotación: -45 grados (muy bajo) a +45 grados (muy alto)
+            const rotation = (clampedCents / 50) * 45; 
+            meterNeedle.style.transform = `rotate(${rotation}deg)`;
+            
+            // 4. Actualizar Color de la Nota
+            let colorClass;
+            
+            if (isGreenSticky) {
+                colorClass = 'text-emerald-400';
+            } else if (isPlaying && Math.abs(cents) <= 20) {
+                colorClass = 'text-yellow-400';
+            } else if (isPlaying) {
+                colorClass = 'text-red-400';
+            } else {
+                colorClass = 'text-white';
             }
 
-            userProgress = Math.max(0, Math.min(100, userProgress));
-            
-            progressBar.style.width = `${userProgress.toFixed(0)}%`;
-            progressBar.textContent = `${userProgress.toFixed(0)}%`;
+            const currentTargetName = getTarget().name;
 
-            if (userProgress >= 100) {
-                userProgress = 0; 
-                currentTargetIndex = (currentTargetIndex + 1) % TARGET_MIDI_SCALE_C4.length;
-                updateTargetUI(); // Actualiza la UI antes de reproducir
-                playTargetNote(); // Reproduce la nueva nota
-                statusMessage.textContent = '¡Siguiente! 🎵 Mantén la afinación...';
+            // Solo actualizar si el estado cambió o si la nota no coincide
+            if (!noteDisplay.classList.contains(colorClass) || noteDisplay.textContent !== currentTargetName) {
+                noteDisplay.className = `text-6xl sm:text-8xl font-extrabold mb-2 transition-colors duration-300 ${colorClass}`;
+                noteDisplay.textContent = currentTargetName;
             }
-        }
-
-        // --- Funciones de Dibujo (Canvas) ---
-        function resizeCanvas() {
-            const container = canvas.parentElement.parentElement;
-            WIDTH = container.clientWidth;
-            canvas.width = WIDTH;
-        }
-
-        function drawPitchVisual(detectedMidi, cents, isPlaying) {
-            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
             
-            const staffY = HEIGHT / 2; 
-            const lineSpacing = 15; 
-            const noteRadius = 7;
-            const target = getCurrentTargetNote();
-            const centerMidi = targetMidiOffset === 0 ? 60 : 48; // C4 o C3 como referencia
-
-            // 1. Dibujar las 5 líneas del Pentagrama (Staff Lines)
-            canvasCtx.strokeStyle = '#000000';
-            canvasCtx.lineWidth = 1;
-            for (let i = -2; i <= 2; i++) {
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(0, staffY + i * lineSpacing);
-                canvasCtx.lineTo(WIDTH, staffY + i * lineSpacing);
-                canvasCtx.stroke();
-            }
-
-            // 2. Dibujar la Nota Objetivo (Fija)
-            // Calculamos la posición Y. +4 es para centrar la visualización en la línea E (mi)
-            const targetY = staffY - (target.midi - centerMidi - 4) * (lineSpacing / 2);
-            
-            canvasCtx.fillStyle = '#f59e0b'; // Amarillo (borde)
-            canvasCtx.beginPath();
-            canvasCtx.arc(WIDTH / 4, targetY, noteRadius + 2, 0, 2 * Math.PI);
-            canvasCtx.fill();
-            
-            canvasCtx.fillStyle = '#fcd34d'; // Amarillo claro (relleno)
-            canvasCtx.beginPath();
-            canvasCtx.arc(WIDTH / 4, targetY, noteRadius, 0, 2 * Math.PI);
-            canvasCtx.fill();
-            
-            canvasCtx.font = 'bold 12px sans-serif';
-            canvasCtx.textAlign = 'center';
-            canvasCtx.fillStyle = '#1f2937'; 
-            canvasCtx.fillText(target.name, WIDTH / 4, targetY - 15);
-
-
-            if (isPlaying) {
-                // 3. Dibujar la Nota Detectada (Dinámica, con desviación vertical)
-                
-                let drawCents = Math.min(Math.max(cents, -50), 50); // Clamping para un semitono de visualización
-                
-                // Posición base de la nota detectada (redondeada al semitono más cercano)
-                const baseDetectedY = staffY - (detectedMidi - centerMidi - 4) * (lineSpacing / 2);
-                
-                // Ajustar posición Y por la desviación en cents
-                const centDeviationY = (-drawCents / 100) * (lineSpacing / 2);
-                const finalDetectedY = baseDetectedY + centDeviationY;
-                
-                let color;
-                const absCents = Math.abs(cents);
-
-                if (absCents <= ACCURACY_THRESHOLD) { 
-                    color = '#10b981'; // Verde (Afinado)
-                } else if (absCents <= 30) { 
-                    color = '#f59e0b'; // Amarillo (Cerca)
-                } else { 
-                    color = '#ef4444'; // Rojo (Desafinado)
-                }
-
-                // Dibujar el punto de tono detectado
-                canvasCtx.fillStyle = color;
-                canvasCtx.shadowColor = color;
-                canvasCtx.shadowBlur = 15;
-                canvasCtx.beginPath();
-                canvasCtx.arc(WIDTH * 0.75, finalDetectedY, noteRadius + 3, 0, 2 * Math.PI);
-                canvasCtx.fill();
-                canvasCtx.shadowBlur = 0; 
-
-                canvasCtx.font = 'bold 12px sans-serif';
-                canvasCtx.textAlign = 'center';
-                canvasCtx.fillStyle = '#ffffff'; 
-                canvasCtx.fillText(midiToNoteString(detectedMidi), WIDTH * 0.75, finalDetectedY - 15);
-
-                
-            } else if (isTunerRunning) {
-                // Micrófono activo pero sin sonido
-                 canvasCtx.font = '18px sans-serif';
-                canvasCtx.textAlign = 'center';
-                canvasCtx.fillStyle = '#6b7280'; 
-                canvasCtx.fillText('Esperando tu voz...', WIDTH / 2, staffY + 7);
+            if (isGreenSticky) {
+                statusMessage.textContent = `¡AFINADO! ✅ Peristencia: ${greenPersistence.toFixed(0)}%`;
+                statusMessage.classList.add('text-emerald-400');
+                statusMessage.classList.remove('text-yellow-400', 'text-red-400');
+            } else if (isPlaying) {
+                statusMessage.textContent = `${cents.toFixed(1)} cents`;
+                 statusMessage.classList.remove('text-emerald-400');
+                 statusMessage.classList.add(Math.abs(cents) <= 20 ? 'text-yellow-400' : 'text-red-400');
+            } else {
+                statusMessage.textContent = 'Micrófono activo. Toca la cuerda.';
+                statusMessage.classList.add('text-yellow-400');
+                statusMessage.classList.remove('text-emerald-400', 'text-red-400');
             }
         }
-
-        // --- Bucle Principal ---
         
+        // --- Bucle Principal de Detección ---
+
         function tick() {
             if (!isTunerRunning || !analyser || !dataArray) {
-                requestAnimationFrame(tick);
+                animationFrameId = requestAnimationFrame(tick);
                 return;
             }
 
-            const target = getCurrentTargetNote();
+            const target = getTarget();
             analyser.getFloatTimeDomainData(dataArray);
             const sampleRate = audioContext.sampleRate;
             
             let detectedFreq = getFundamentalFreq(dataArray, sampleRate);
             let cents = 0;
-            let detectedMidi = 0;
-            let isPlaying = false;
+            let isPlaying = detectedFreq > 0;
 
-            if (detectedFreq > 0) {
-                isPlaying = true;
-                
+            if (isPlaying) {
+                // Calcular la desviación de la frecuencia objetivo
                 cents = centsOff(detectedFreq, target.freq);
                 
-                const rawMidiNote = freqToMidi(detectedFreq);
-                detectedMidi = Math.round(rawMidiNote);
-                
-                frequencyDisplay.textContent = `${detectedFreq.toFixed(2)} Hz`;
-
-                // Actualizar Progreso
-                updateProgress(cents, Math.abs(cents) <= ACCURACY_THRESHOLD);
+                // Actualizar la interfaz
+                updateDisplay(cents, detectedFreq, true);
 
             } else {
-                // Silencio
-                detectedNoteDisplay.textContent = '---';
-                frequencyDisplay.textContent = '0.0 Hz';
-                detectedMidi = 0; 
-                // El progreso decae solo si no hay detección clara
-                updateProgress(100, false); 
+                // Silencio o Detección fallida
+                updateDisplay(0, 0, false);
             }
 
-            // Dibujar Canvas
-            drawPitchVisual(detectedMidi, cents, isPlaying);
-            
-            requestAnimationFrame(tick);
+            animationFrameId = requestAnimationFrame(tick);
         }
 
         // --- Inicialización y Event Handlers ---
 
-        function handleVoiceRangeChange(event) {
-            // El valor es el offset MIDI
-            targetMidiOffset = parseInt(event.target.value, 10); 
-            
-            // Resetear
-            currentTargetIndex = 0;
-            userProgress = 0;
-            progressBar.style.width = '0%';
-            progressBar.textContent = '0%';
-            
-            updateTargetUI();
-
-            // Si el afinador ya está corriendo, reproducir la nueva nota guía
-            if (isTunerRunning && synth) { 
-                playTargetNote();
-            }
-        }
-
-        voiceRangeInputs.forEach(input => {
-            input.addEventListener('change', handleVoiceRangeChange);
-        });
-        
-        playToneButton.addEventListener('click', () => {
-             // Iniciar Tone.js en el primer click si no se ha hecho
-            if (!synth) {
-                initAudioContext();
-            }
-            playTargetNote();
-        });
-
-
         async function initAudioContext() {
-            // Inicializar AudioContext y Tone.js
             try {
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
-                
-                if (!synth) {
-                    await Tone.start(); // Iniciar Tone.js
-                    synth = new Tone.Synth({
-                        oscillator: { type: 'sine' },
-                        envelope: { attack: 0.005, decay: 0.1, sustain: 0.2, release: 1 },
-                    }).toDestination();
-                }
-                playToneButton.disabled = false;
-                
             } catch (err) {
-                 console.error("Error al inicializar el AudioContext o Tone.js:", err);
+                 console.error("Error al inicializar el AudioContext:", err);
             }
         }
-
 
         async function startTuner() {
             if (isTunerRunning) return;
@@ -452,57 +389,70 @@
             statusMessage.textContent = 'Iniciando micrófono...';
             startTunerButton.textContent = 'Iniciando...';
             
-            // 1. Asegurar Contexto de Audio
             await initAudioContext();
 
             try {
-                // 2. Acceder al Micrófono
+                // Acceder al Micrófono
                 if (!mediaStream) {
                     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 }
                 
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 analyser = audioContext.createAnalyser();
-                analyser.fftSize = 2048; 
+                analyser.fftSize = 4096; // Mayor FFT size para mejor resolución de baja frecuencia
                 dataArray = new Float32Array(analyser.fftSize);
 
                 source.connect(analyser);
                 
                 isTunerRunning = true;
-                statusMessage.textContent = '¡Micrófono Activo! Tono Guía listo.';
+                statusMessage.textContent = '¡Micrófono Activo! Toca la cuerda.';
                 startTunerButton.textContent = 'Afinador Activo';
                 startTunerButton.classList.remove('bg-blue-600');
                 startTunerButton.classList.add('bg-emerald-600');
                 micStatusLight.classList.remove('bg-red-500', 'mic-status-off');
                 micStatusLight.classList.add('bg-emerald-500', 'mic-status-on');
 
-                // Iniciar la primera nota (que también la reproduce)
-                updateTargetUI();
-                playTargetNote();
-
                 // Iniciar el bucle de detección de tono
-                tick(); 
+                if (!animationFrameId) {
+                    tick(); 
+                }
 
             } catch (err) {
                 console.error("Error al acceder al micrófono:", err);
-                statusMessage.textContent = `ERROR: Acceso al micrófono denegado. Asegúrate de tener permisos. Detalles: ${err.name}`;
+                statusMessage.textContent = `ERROR: Acceso al micrófono denegado. Asegúrate de tener permisos.`;
                 statusMessage.classList.remove('text-yellow-400');
                 statusMessage.classList.add('text-red-500');
                 startTunerButton.disabled = false;
                 startTunerButton.textContent = 'Reintentar Micrófono';
+                micStatusLight.classList.remove('bg-emerald-500', 'mic-status-on');
+                micStatusLight.classList.add('bg-red-500', 'mic-status-off');
             }
         }
 
+        function setInstrument(instrumentKey) {
+            document.getElementById(`select-${currentInstrument}`).classList.remove('selected');
+            currentInstrument = instrumentKey;
+            document.getElementById(`select-${currentInstrument}`).classList.add('selected');
+            
+            // Reiniciar estado
+            currentStringIndex = 0;
+            greenPersistence = 0; 
+            
+            updateStringButtons();
+            updateDisplay(0, 0, false);
+        }
+
+        // --- Event Listeners Globales ---
         startTunerButton.addEventListener('click', startTuner);
-        
-        // Inicializar el tamaño del canvas y el display de la nota inicial (C3)
-        window.addEventListener('resize', resizeCanvas);
+        document.getElementById('select-guitar').addEventListener('click', () => setInstrument('guitar'));
+        document.getElementById('select-ukulele').addEventListener('click', () => setInstrument('ukulele'));
+
+        // Inicialización al cargar
         document.addEventListener('DOMContentLoaded', () => {
-            resizeCanvas();
-            // Inicializar el offset y la UI
-            handleVoiceRangeChange({ target: { value: '-12' } }); 
-            // Iniciar el bucle de renderizado del canvas inmediatamente (para dibujar staff)
-            requestAnimationFrame(tick);
+            // Establecer el instrumento inicial y actualizar botones
+            setInstrument('guitar');
+            // Iniciar el bucle de renderizado para mostrar la UI vacía
+            tick(); 
         });
 
     </script>
