@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador Estable</title>
+    <!-- Incluir Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para la interfaz del afinador */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* Fondo muy claro */
+        }
+        .tuner-card {
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+        }
+
+        /* Estilos para el Dial del Afinador (Gauge) */
+        .gauge-container {
+            width: 300px;
+            height: 150px;
+            overflow: hidden; /* Oculta la mitad inferior del círculo */
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .gauge-dial {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            border: 15px solid #e2e8f0; /* Color del borde del dial */
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); /* Solo muestra la mitad superior */
+        }
+
+        .gauge-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150px; /* Longitud de la aguja desde el centro */
+            height: 4px;
+            background-color: #4f46e5;
+            transform-origin: 0% 50%; /* Punto de pivote es el centro */
+            transition: transform 0.1s ease-out; /* Animación suave */
+            /* La aguja debe empezar a -90deg (extremo izquierdo) */
+            transform: translate(-100%, -50%) rotate(-90deg);
+            z-index: 10;
+        }
+        
+        /* Estilos para el centro del pivote */
+        .gauge-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            background-color: #4f46e5;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 15;
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+        }
+
+        /* Indicador de afinación (zona verde) */
+        .in-tune-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 300px;
+            height: 300px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            /* Mostrar solo el arco de +5 a -5 cents (centro) */
+            clip-path: polygon(40% 0, 60% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
+        }
+
+        .note-display {
+            min-height: 120px;
+            transition: background-color 0.3s ease;
+        }
+
+        .in-tune {
+            background-color: #d1fae5; /* Fondo verde muy claro para afinado */
+        }
+
+        .mic-button-running {
+            background-color: #ef4444 !important; /* Rojo al estar activo */
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4) !important;
+        }
+    </style>
+    <script>
+        // --- Definiciones de Presets de Afinación ---
+        // Frecuencias objetivo para las cuerdas (en Hz).
+        const PRESETS = {
+            'Guitarra Estándar': [
+                { note: 'E2', freq: 82.41 },
+                { note: 'A2', freq: 110.00 },
+                { note: 'D3', freq: 146.83 },
+                { note: 'G3', freq: 196.00 },
+                { note: 'B3', freq: 246.94 },
+                { note: 'E4', freq: 329.63 }
+            ],
+            'Ukelele Estándar': [
+                { note: 'G4', freq: 392.00 },
+                { note: 'C4', freq: 261.63 },
+                { note: 'E4', freq: 329.63 },
+                { note: 'A4', freq: 440.00 }
+            ]
+        };
+
+        // Estado global
+        let audioContext;
+        let analyser;
+        let mediaStream;
+        let rafId;
+        let currentPreset = 'Guitarra Estándar'; // Valor inicial
+
+        // Estado de la aplicación
+        let state = {
+            isListening: false,
+            currentNote: '...',
+            currentCents: 0, // Desviación en cents (-50 a +50)
+            statusMessage: 'Presiona Iniciar para afinar.',
+        };
+
+        // --- Funciones de Utilidad de Tono ---
+
+        /**
+         * Calcula la frecuencia más cercana a un valor dado dentro del preset actual.
+         * @param {number} frequency - Frecuencia detectada en Hz.
+         * @returns {{name: string, targetFreq: number, cents: number}} - Información de la afinación.
+         */
+        function getClosestTargetNote(frequency) {
+            if (frequency < 40) { // Frecuencia mínima audible para instrumentos
+                return { name: '...', targetFreq: 0, cents: 0 };
+            }
+
+            const targets = PRESETS[currentPreset];
+            let closest = null;
+            let minDiff = Infinity;
+            
+            // 1. Encontrar la frecuencia objetivo más cercana
+            for (const target of targets) {
+                const diff = Math.abs(target.freq - frequency);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = target;
+                }
+            }
+
+            if (!closest) {
+                return { name: '...', targetFreq: 0, cents: 0 };
+            }
+
+            // 2. Calcular la desviación en Cents
+            // Fórmula: cents = 1200 * log2(f_actual / f_ideal)
+            const cents = Math.round(1200 * Math.log2(frequency / closest.freq));
+            
+            // Un buen afinador busca la cuerda más cercana (no el semitono) y calcula la desviación de esa cuerda.
+            // Aseguramos que la nota sea la del preset, incluso si la frecuencia está en otro semitono.
+            
+            return {
+                name: closest.note,
+                targetFreq: closest.freq,
+                cents: cents // Cents relativos al target: -50 a 50 idealmente
+            };
+        }
+
+        /**
+         * Implementa el algoritmo de auto-correlación (por ejemplo, YIN simplificado)
+         * para estimar el tono (frecuencia fundamental).
+         * @param {Float32Array} buffer - Array de datos de audio.
+         * @param {number} sampleRate - Tasa de muestreo del audio.
+         * @returns {number} - Frecuencia fundamental estimada en Hz.
+         */
+        function autoCorrelate(buffer, sampleRate) {
+            const volumeThreshold = 0.01;
+            let sumOfSquares = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                sumOfSquares += buffer[i] * buffer[i];
+            }
+            const rms = Math.sqrt(sumOfSquares / buffer.length);
+            if (rms < volumeThreshold) {
+                return 0; // Silencio
+            }
+
+            // AMDF simplificado (Pitch Detection)
+            let minDiff = Infinity;
+            let bestPeriod = -1;
+            // Rango de búsqueda: Cuerdas de E2 (82Hz) a A4 (440Hz)
+            const minPeriod = sampleRate / 600; 
+            const maxPeriod = sampleRate / 80;  
+
+            for (let period = minPeriod; period <= maxPeriod; period++) {
+                let diff = 0;
+                for (let i = 0; i < buffer.length - period; i++) {
+                    const delta = buffer[i] - buffer[i + period];
+                    diff += Math.abs(delta);
+                }
+
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestPeriod = period;
+                }
+            }
+
+            return (bestPeriod > 0) ? sampleRate / bestPeriod : 0;
+        }
+
+        // --- Lógica del Afinador y UI ---
+
+        /**
+         * Actualiza la interfaz gráfica según el estado del afinador.
+         */
+        function updateUI() {
+            const noteDisplayEl = document.getElementById('note-display');
+            const needleEl = document.getElementById('gauge-needle');
+            const centsDisplayEl = document.getElementById('cents-display');
+            const statusDisplayEl = document.getElementById('status-message');
+            const instrumentSelector = document.getElementById('instrument-select');
+            
+            // 1. Actualizar el estado del afinador
+            statusDisplayEl.textContent = state.statusMessage;
+
+            // 2. Manejar la aguja (Needle)
+            // La desviación de cents va de -50 (extremo izquierdo) a +50 (extremo derecho).
+            // Mapeamos [-50, 50] a [-90deg, 90deg].
+            // Angulo = (cents / 50) * 90deg
+            let rotationDeg;
+            if (state.currentNote === '...') {
+                // Si no hay sonido, la aguja queda en el centro (0deg, que es 90deg desde el inicio)
+                rotationDeg = 0;
+                centsDisplayEl.textContent = '-';
+                centsDisplayEl.classList.remove('text-green-500', 'text-red-500');
+                centsDisplayEl.classList.add('text-gray-500');
+            } else {
+                rotationDeg = Math.min(90, Math.max(-90, (state.currentCents / 50) * 90));
+
+                centsDisplayEl.textContent = `${state.currentCents > 0 ? '+' : ''}${state.currentCents} cents`;
+                
+                // Zona Verde: afinado
+                const isTune = Math.abs(state.currentCents) <= 5;
+                if (isTune) {
+                    noteDisplayEl.classList.add('in-tune', 'shadow-xl');
+                    noteDisplayEl.classList.remove('shadow-lg');
+                    centsDisplayEl.classList.add('text-green-500');
+                    centsDisplayEl.classList.remove('text-red-500', 'text-gray-500');
+                } else {
+                    noteDisplayEl.classList.remove('in-tune');
+                    noteDisplayEl.classList.add('shadow-lg');
+                    centsDisplayEl.classList.add('text-red-500');
+                    centsDisplayEl.classList.remove('text-green-500', 'text-gray-500');
+                }
+            }
+            
+            // Aplicar la rotación (iniciamos la aguja en -90deg)
+            // La rotación total es el offset inicial (-90) + el ángulo de desviación
+            needleEl.style.transform = `translate(-100%, -50%) rotate(${rotationDeg}deg)`;
+            document.getElementById('note-name').textContent = state.currentNote;
+
+            // 3. Estado del botón
+            const micButton = document.getElementById('mic-button');
+            if (state.isListening) {
+                micButton.classList.add('mic-button-running');
+                micButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                micButton.textContent = 'DETENER Afinador';
+                instrumentSelector.disabled = true;
+            } else {
+                micButton.classList.remove('mic-button-running');
+                micButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                micButton.textContent = 'INICIAR Afinador';
+                instrumentSelector.disabled = false;
+            }
+
+            // 4. Mostrar cuerdas objetivo
+            const targetStrings = PRESETS[currentPreset].map(t => t.note).join(' · ');
+            document.getElementById('target-strings').textContent = targetStrings;
+        }
+
+
+        /**
+         * Bucle principal de procesamiento de audio.
+         */
+        function processAudio() {
+            if (!state.isListening || !analyser) return;
+
+            const bufferSize = analyser.fftSize;
+            const buffer = new Float32Array(bufferSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            const sampleRate = audioContext.sampleRate;
+            const frequency = autoCorrelate(buffer, sampleRate);
+
+            if (frequency > 0) {
+                const result = getClosestTargetNote(frequency);
+                state.currentNote = result.name;
+                state.currentCents = result.cents;
+
+                if (Math.abs(result.cents) <= 5) {
+                    state.statusMessage = `¡AFINADO! Cuerda: ${result.name}`;
+                } else {
+                    state.statusMessage = result.cents < 0 ? `¡Demasiado BAJO! Cuerda: ${result.name}` : `¡Demasiado ALTO! Cuerda: ${result.name}`;
+                }
+            } else {
+                state.currentNote = '...';
+                state.currentCents = 0;
+                state.statusMessage = '¡Toca una cuerda para empezar a afinar!';
+            }
+
+            updateUI();
+            rafId = requestAnimationFrame(processAudio);
+        }
+
+        /**
+         * Detiene la escucha y libera los recursos del micrófono.
+         */
+        function stopListening() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
+            state.isListening = false;
+            state.currentNote = '...';
+            state.currentCents = 0;
+            state.statusMessage = 'Afinador DETENIDO. Presiona Iniciar.';
+            updateUI();
+        }
+
+        /**
+         * Inicia o detiene el afinador.
+         */
+        async function toggleTuner() {
+            if (state.isListening) {
+                stopListening();
+                return;
+            }
+
+            // 1. Inicializar AudioContext en el evento click (Corrección principal)
+            if (!audioContext) {
+                // Verificar compatibilidad y crear contexto
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048; 
+            }
+
+            try {
+                // 2. Solicitar micrófono
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                source.connect(analyser);
+
+                state.isListening = true;
+                state.statusMessage = 'Escuchando... ¡Toca una cuerda!';
+
+                processAudio(); // Iniciar el bucle de procesamiento
+                updateUI();
+
+            } catch (err) {
+                console.error("Error al acceder al micrófono:", err);
+                state.statusMessage = 'ERROR: Se necesita permiso de micrófono. Inténtalo de nuevo.';
+                stopListening();
+            }
+        }
+
+        /**
+         * Maneja el cambio del selector de instrumento.
+         */
+        function handleInstrumentChange(event) {
+            currentPreset = event.target.value;
+            // Reinicia el estado visual para reflejar el nuevo preset
+            state.currentNote = '...';
+            state.currentCents = 0;
+            updateUI();
+            // Si estaba escuchando, se detiene y reinicia para reflejar el cambio en el loop
+            if (state.isListening) {
+                stopListening();
+            }
+        }
+        
+        // Asignar listeners al cargar la página
+        window.onload = () => {
+            document.getElementById('mic-button').addEventListener('click', toggleTuner);
+            document.getElementById('instrument-select').addEventListener('change', handleInstrumentChange);
+            updateUI();
+        };
+
+    </script>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="tuner-card w-full max-w-lg mx-auto rounded-2xl p-6 md:p-10 text-center">
+        <!-- Encabezado con Bandera -->
+        <div class="text-3xl font-extrabold text-gray-800 flex items-center justify-center mb-6">
+            <span class="mr-2 text-indigo-600">Afinador Estándar</span>
+            <span class="text-2xl" aria-label="Bandera de Ucrania">🇺🇦</span>
+        </div>
+
+        <!-- Selector de Instrumento -->
+        <div class="mb-8">
+            <label for="instrument-select" class="block text-sm font-medium text-gray-700 mb-2">Selecciona Instrumento:</label>
+            <select id="instrument-select" 
+                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-lg font-semibold bg-white border">
+                <option value="Guitarra Estándar">Guitarra Estándar</option>
+                <option value="Ukelele Estándar">Ukelele Estándar</option>
+            </select>
+        </div>
+        
+        <!-- Cuerdas Objetivo -->
+        <div class="text-md font-semibold text-gray-600 mb-8 p-3 bg-indigo-50 rounded-lg shadow-inner">
+            Cuerdas Objetivo: <span id="target-strings" class="font-extrabold text-indigo-800">E2 · A2 · D3 · G3 · B3 · E4</span>
+        </div>
+
+        <!-- Pantalla de Nota Principal -->
+        <div id="note-display" class="note-display flex flex-col items-center justify-center rounded-xl mb-8 p-6 shadow-lg border-2 border-gray-100">
+            <div id="note-name" class="text-9xl font-black text-gray-900 leading-none mb-2">
+                ...
+            </div>
+            <div id="status-message" class="text-lg font-semibold text-gray-700">
+                Afinador DETENIDO. Presiona Iniciar.
+            </div>
+        </div>
+
+        <!-- Gauge/Dial de Afinación -->
+        <div class="gauge-container mb-4">
+            <div class="gauge-dial">
+                <!-- Marcadores de Afinación (Bajo/Alto) -->
+                <div class="absolute w-full h-full bottom-0 left-0 flex justify-between transform -translate-y-1/2">
+                    <span class="text-xl font-bold text-red-500 transform rotate-[135deg] origin-center -translate-x-1/2">♭</span>
+                    <span class="text-xl font-bold text-red-500 transform rotate-[-135deg] origin-center translate-x-1/2">♯</span>
+                </div>
+            </div>
+            <!-- Aguja (Needle) -->
+            <div id="gauge-needle" class="gauge-needle"></div>
+            <!-- Centro del Pivote -->
+            <div class="gauge-center"></div>
+        </div>
+
+        <!-- Desviación en Cents -->
+        <div class="text-center mb-8">
+            <div id="cents-display" class="text-3xl font-extrabold text-gray-500 transition-colors duration-300">
+                -
+            </div>
+        </div>
+
+        <!-- Botón de Micrófono -->
+        <div class="flex justify-center">
+            <button id="mic-button"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-10 rounded-full shadow-xl transition duration-300 transform hover:scale-105 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0a7 7 0 017-7v0a7 7 0 017 7v0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3M15 3h-6"></path>
+                </svg>
+                INICIAR Afinador
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>
