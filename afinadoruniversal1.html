@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador Universal</title>
+    <!-- Incluir Tailwind CSS para estilos modernos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para la interfaz del afinador */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+        .tuner-card {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            background-color: white;
+            padding: 2rem;
+        }
+        .note-display {
+            min-height: 150px;
+            background: linear-gradient(145deg, #e6e6e6, #ffffff);
+            box-shadow: inset 5px 5px 10px #cccccc, inset -5px -5px 10px #ffffff;
+        }
+        .pitch-bar {
+            height: 10px;
+            transition: transform 0.1s ease-out;
+            transform-origin: center;
+        }
+        .pitch-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #4f46e5;
+            position: absolute;
+            top: -3px;
+            transition: left 0.1s ease-out;
+            box-shadow: 0 0 8px rgba(79, 70, 229, 0.7);
+        }
+        /* La clase 'in-tune' se aplica cuando la nota está afinada */
+        .in-tune .pitch-dot {
+            background-color: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.9);
+        }
+        .microphone-status {
+            min-height: 40px;
+        }
+    </style>
+    <script>
+        // Mapeo de frecuencias de notas (en Hz) para el temperamento igual.
+        // Usamos A4 = 440 Hz como referencia.
+        const NOTE_FREQUENCIES = {
+            'C': 16.35, 'C#': 17.32, 'D': 18.35, 'D#': 19.45, 'E': 20.60, 'F': 21.83,
+            'F#': 23.12, 'G': 24.50, 'G#': 25.96, 'A': 27.50, 'A#': 29.14, 'B': 30.87
+        };
+        const NOTE_NAMES = Object.keys(NOTE_FREQUENCIES);
+        const NOTES_PER_OCTAVE = 12;
+
+        let audioContext;
+        let analyser;
+        let mediaStream;
+        let rafId;
+
+        // Estado de la aplicación
+        let state = {
+            isListening: false,
+            currentNote: '...',
+            currentCents: 0, // Desviación en cents (-50 a +50)
+            statusMessage: 'Haz clic en el micrófono para empezar.',
+            isReady: false,
+        };
+
+        // --- Funciones de Utilidad ---
+
+        /**
+         * Calcula la frecuencia más cercana a un valor dado.
+         * @param {number} frequency - La frecuencia medida en Hz.
+         * @returns {{name: string, frequency: number, cents: number}} - Objeto con el nombre, frecuencia ideal y desviación en cents.
+         */
+        function getClosestNote(frequency) {
+            if (frequency < 10) {
+                return { name: '...', frequency: 0, cents: 0 };
+            }
+
+            // Encontrar el logaritmo base 2 de la razón de la frecuencia a la frecuencia más baja (C0)
+            const n = NOTES_PER_OCTAVE * (Math.log2(frequency / NOTE_FREQUENCIES['C']));
+
+            // Redondear al número entero más cercano (el índice de la nota)
+            const noteIndex = Math.round(n);
+            const noteName = NOTE_NAMES[noteIndex % NOTES_PER_OCTAVE];
+            const octave = Math.floor(noteIndex / NOTES_PER_OCTAVE);
+            const idealFrequency = NOTE_FREQUENCIES['C'] * Math.pow(2, noteIndex / NOTES_PER_OCTAVE);
+
+            // Calcular la desviación en cents (100 cents = 1 semitono)
+            const cents = Math.floor(1200 * Math.log2(frequency / idealFrequency)) % 100;
+
+            return {
+                name: noteName + octave,
+                frequency: idealFrequency,
+                cents: cents > 50 ? cents - 100 : (cents < -50 ? cents + 100 : cents) // Ajustar al rango de -50 a +50
+            };
+        }
+
+        /**
+         * Implementa el algoritmo de auto-correlación (por ejemplo, YIN o AMDF simplificado)
+         * para estimar el tono (frecuencia fundamental).
+         * @param {Float32Array} buffer - Array de datos de audio.
+         * @param {number} sampleRate - Tasa de muestreo del audio.
+         * @returns {number} - Frecuencia fundamental estimada en Hz.
+         */
+        function autoCorrelate(buffer, sampleRate) {
+            // Un umbral de volumen bajo para evitar ruido de fondo
+            const volumeThreshold = 0.01;
+            let sumOfSquares = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                sumOfSquares += buffer[i] * buffer[i];
+            }
+            const rms = Math.sqrt(sumOfSquares / buffer.length);
+            if (rms < volumeThreshold) {
+                return 0;
+            }
+
+            // Implementación básica del algoritmo de Detección de Frecuencia Media Diferencial (AMDF)
+            let minDiff = Infinity;
+            let bestPeriod = -1;
+            const minPeriod = sampleRate / 600; // Máx 600 Hz
+            const maxPeriod = sampleRate / 40;  // Mín 40 Hz (rango de guitarra estándar)
+
+            for (let period = minPeriod; period <= maxPeriod; period++) {
+                let diff = 0;
+                for (let i = 0; i < buffer.length - period; i++) {
+                    const delta = buffer[i] - buffer[i + period];
+                    diff += Math.abs(delta);
+                }
+
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestPeriod = period;
+                }
+            }
+
+            // Refinamiento simple para obtener un valor flotante más preciso
+            if (bestPeriod > 0) {
+                return sampleRate / bestPeriod;
+            }
+            return 0;
+        }
+
+        // --- Lógica del Afinador y UI ---
+
+        /**
+         * Actualiza la interfaz gráfica según el estado del afinador.
+         */
+        function updateUI() {
+            document.getElementById('note-name').textContent = state.currentNote;
+            document.getElementById('status-message').textContent = state.statusMessage;
+
+            const noteDisplayEl = document.getElementById('note-display-card');
+            const pointerDot = document.getElementById('pitch-dot');
+
+            // 1. Manejar la luz indicadora de afinación
+            const isTune = Math.abs(state.currentCents) <= 5; // En +/- 5 cents
+            if (isTune && state.currentNote !== '...') {
+                noteDisplayEl.classList.add('in-tune');
+                document.getElementById('pitch-bar-container').classList.add('in-tune');
+                document.getElementById('cents-display').classList.add('text-green-500');
+                document.getElementById('cents-display').classList.remove('text-red-500', 'text-gray-500');
+            } else {
+                noteDisplayEl.classList.remove('in-tune');
+                document.getElementById('pitch-bar-container').classList.remove('in-tune');
+                if (state.currentNote !== '...') {
+                    document.getElementById('cents-display').classList.add('text-red-500');
+                    document.getElementById('cents-display').classList.remove('text-green-500', 'text-gray-500');
+                } else {
+                    document.getElementById('cents-display').classList.add('text-gray-500');
+                    document.getElementById('cents-display').classList.remove('text-red-500', 'text-green-500');
+                }
+            }
+
+            // 2. Mover el indicador de cents
+            // Mapear el valor de cents (-50 a 50) a una posición de 0% a 100%
+            // La posición Left (0% a 100%) será (cents + 50) * 1%
+            const pointerPosition = (state.currentCents + 50); // Valor de 0 a 100
+            
+            // Ajustar la posición para que el punto quede centrado en el lugar correcto.
+            // La barra es width-full, el punto es de 16px (0.5rem * 4). 'calc(${pointerPosition}% - 8px)'
+            pointerDot.style.left = `calc(${pointerPosition}% - 8px)`;
+
+            // 3. Mostrar la desviación en texto
+            document.getElementById('cents-display').textContent = `${state.currentCents} cents`;
+        }
+
+
+        /**
+         * Bucle principal de procesamiento de audio.
+         */
+        function processAudio() {
+            if (!state.isListening) return;
+
+            const bufferSize = analyser.fftSize;
+            const buffer = new Float32Array(bufferSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            const sampleRate = audioContext.sampleRate;
+            const frequency = autoCorrelate(buffer, sampleRate);
+
+            if (frequency > 0) {
+                const result = getClosestNote(frequency);
+                state.currentNote = result.name;
+                state.currentCents = result.cents;
+
+                if (Math.abs(result.cents) > 5) {
+                    state.statusMessage = result.cents < 0 ? '¡Demasiado BAJO!' : '¡Demasiado ALTO!';
+                } else {
+                    state.statusMessage = '¡AFINADO!';
+                }
+            } else {
+                state.currentNote = '...';
+                state.currentCents = 0;
+                state.statusMessage = '¡Toca una cuerda!';
+            }
+
+            updateUI();
+            rafId = requestAnimationFrame(processAudio);
+        }
+
+        /**
+         * Detiene la escucha y libera los recursos del micrófono.
+         */
+        function stopListening() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
+            state.isListening = false;
+            state.currentNote = '...';
+            state.currentCents = 0;
+            state.statusMessage = 'Haz clic en el micrófono para empezar.';
+            updateUI();
+            document.getElementById('mic-button').classList.remove('bg-red-500', 'hover:bg-red-600');
+            document.getElementById('mic-button').classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }
+
+        /**
+         * Inicia la escucha y obtiene permiso del micrófono.
+         */
+        async function startListening() {
+            if (state.isListening) {
+                stopListening();
+                return;
+            }
+
+            // Inicializar AudioContext en el primer click
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048; // Tamaño del búfer de análisis
+            }
+
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                source.connect(analyser);
+
+                state.isListening = true;
+                state.statusMessage = 'Escuchando... ¡Toca una cuerda!';
+
+                document.getElementById('mic-button').classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                document.getElementById('mic-button').classList.add('bg-red-500', 'hover:bg-red-600');
+
+                processAudio(); // Iniciar el bucle de procesamiento
+                updateUI();
+
+            } catch (err) {
+                console.error("Error al acceder al micrófono:", err);
+                state.statusMessage = 'Error: Necesitas dar permiso al micrófono.';
+                state.isReady = false;
+                updateUI();
+                stopListening();
+            }
+        }
+
+        // Asignar el listener al botón después de que la página cargue
+        window.onload = () => {
+            document.getElementById('mic-button').addEventListener('click', startListening);
+            // Inicia la UI por defecto
+            updateUI();
+        };
+
+    </script>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="tuner-card w-full max-w-md mx-auto rounded-xl">
+        <!-- Encabezado y Título -->
+        <div class="text-3xl font-extrabold text-gray-800 flex items-center justify-between mb-8 border-b pb-4">
+            <div class="flex items-center">
+                <!-- Icono de Guitarra (SVG) -->
+                <svg class="w-8 h-8 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 5v14M6 5v14M16 5h-4M16 19h-4M8 5h4M8 19h4"></path>
+                </svg>
+                <span>Afinador Universal</span>
+                <!-- EMOJI DE BANDERA DE UCRANIA (UA) -->
+                <span id="flag-icon" class="ml-2 text-2xl" aria-label="Bandera de Ucrania">🇺🇦</span>
+            </div>
+        </div>
+
+        <!-- Pantalla Principal de la Nota -->
+        <div id="note-display-card" class="note-display flex flex-col items-center justify-center rounded-lg mb-8 p-4 transition-all duration-300">
+            <div id="status-message" class="microphone-status text-lg font-semibold text-gray-600 mb-2">
+                Haz clic en el micrófono para empezar.
+            </div>
+            <div id="note-name" class="text-8xl font-black text-gray-800 leading-none">
+                ...
+            </div>
+        </div>
+
+        <!-- Barra de Medición de Tono (Pitch Bar) -->
+        <div class="mb-8 p-2">
+            <!-- Marcadores y Etiquetas -->
+            <div class="flex justify-between text-sm font-semibold text-gray-500 mb-2">
+                <span class="text-red-500">♭ Bajo</span>
+                <span class="text-indigo-600 font-bold">Afinado</span>
+                <span class="text-red-500">♯ Alto</span>
+            </div>
+            <!-- Contenedor de la Barra de Cents -->
+            <div id="pitch-bar-container" class="relative w-full h-3 rounded-full bg-gray-300">
+                <!-- Línea central de afinación perfecta -->
+                <div class="absolute inset-y-0 w-0.5 bg-indigo-600 left-1/2 transform -translate-x-1/2"></div>
+                <!-- Punto indicador -->
+                <div id="pitch-dot" class="pitch-dot absolute -top-1.5 transform -translate-x-1/2"></div>
+            </div>
+        </div>
+
+        <!-- Desviación en Cents -->
+        <div class="text-center mb-10">
+            <div id="cents-display" class="text-2xl font-extrabold text-gray-500 transition-colors duration-300">
+                0 cents
+            </div>
+        </div>
+
+        <!-- Botón de Micrófono -->
+        <div class="flex justify-center">
+            <button id="mic-button"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105 flex items-center">
+                <!-- Icono de Micrófono (SVG) -->
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0a7 7 0 017-7v0a7 7 0 017 7v0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3M15 3h-6"></path>
+                </svg>
+                Iniciar/Detener Afinador
+            </button>
+        </div>
+
+        <div class="text-center text-xs text-gray-400 mt-6">
+            Funciona mejor en un entorno silencioso.
+        </div>
+
+    </div>
+
+</body>
+</html>
