@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="es" class="h-full">
 <head>
     <meta charset="UTF-8">
@@ -30,7 +30,7 @@
 
     <div class="w-full max-w-lg text-center vocal-trainer-container p-8 border border-gray-700">
         <h1 class="text-3xl font-extrabold mb-2 text-emerald-400">🎤 Entrenador de Tono Vocal</h1>
-        <p class="text-gray-400 mb-6">Elige tu rango, inicia el micrófono y canta la nota objetivo.</p>
+        <p class="text-gray-400 mb-6">Elige tu rango y canta la nota objetivo.</p>
 
         <!-- Selección de Rango Vocal -->
         <div class="mb-6">
@@ -49,9 +49,15 @@
             Iniciar Micrófono
         </button>
         <p id="status-message" class="text-lg font-semibold h-6 mt-4 text-yellow-400">Pulsa para iniciar el micrófono...</p>
+        
+        <!-- Display de Amplitud (DEBUG) -->
+        <div class="mt-4 p-2 bg-gray-700 rounded-lg">
+            <p class="text-sm text-gray-400">Diagnóstico de Micrófono (Amplitud)</p>
+            <div id="amplitude-display" class="text-xl font-mono text-fuchsia-400">---</div>
+        </div>
 
         <!-- Display de Nota Objetivo y Detectada -->
-        <div class="mt-8 mb-4">
+        <div class="mt-4 mb-4">
             <p class="text-sm text-gray-400">Nota Objetivo</p>
             <div id="target-note" class="text-5xl font-extrabold text-yellow-300">C4</div>
             <p class="text-sm text-gray-400 mt-2">Tu Nota Detectada</p>
@@ -104,6 +110,7 @@
         const detectedNoteDisplay = document.getElementById('detected-note');
         const targetNoteDisplay = document.getElementById('target-note');
         const frequencyDisplay = document.getElementById('frequency-display');
+        const amplitudeDisplay = document.getElementById('amplitude-display'); // Nuevo display de amplitud
         const progressBar = document.getElementById('progress-bar');
         const voiceRangeInputs = document.querySelectorAll('input[name="voice-range"]');
         const canvas = document.getElementById('pitch-canvas');
@@ -111,31 +118,44 @@
         const WIDTH = canvas.width;
         const HEIGHT = canvas.height;
 
-        // --- Utilidades Musicales (Reutilizadas del afinador) ---
+        // --- Utilidades Musicales ---
         function freqToMidi(freq) { return MIDI_A4 + (12 * Math.log2(freq / A4_FREQ)); }
         function midiToFreq(midi) { return A4_FREQ * Math.pow(2, (midi - MIDI_A4) / 12); }
         function centsOff(freq, targetFreq) { return 1200 * Math.log2(freq / targetFreq); }
         
         /**
-         * Detección de tono por Autocorrelación simplificada.
+         * Detección de tono por Autocorrelación simplificada (mejorada).
          * @param {Float32Array} buffer Array de datos de audio.
          * @param {number} sampleRate Tasa de muestreo.
          * @returns {number} Frecuencia fundamental detectada en Hz.
          */
         function getFundamentalFreq(buffer, sampleRate) {
             const size = buffer.length;
-            const threshold = 0.05; 
+            // Umbral de amplitud más bajo para mayor sensibilidad (de 0.05 a 0.01)
+            const threshold = 0.01; 
             let startIndex = 0;
+
+            // 1. Encontrar el primer punto por encima del umbral
             for (let i = 0; i < size; i++) {
                 if (Math.abs(buffer[i]) > threshold) { startIndex = i; break; }
             }
-            if (startIndex === 0) return 0;
+            if (startIndex === 0) return 0; // Silencio o muy bajo
 
+            // 2. Calcular el Volumen (RMS) para diagnóstico
+            let sumOfSquares = 0;
+            for(let i = 0; i < size; i++) {
+                sumOfSquares += buffer[i] * buffer[i];
+            }
+            const rms = Math.sqrt(sumOfSquares / size);
+            amplitudeDisplay.textContent = rms.toFixed(4);
+
+            // 3. Autocorrelación (ACF)
             let maxCorr = -1;
             let bestPeriod = -1;
-            // Rango de búsqueda optimizado para voz humana (aprox 80Hz a 800Hz)
-            const minPeriod = sampleRate / 800;
-            const maxPeriod = sampleRate / 80; 
+            
+            // Rango de búsqueda: 50Hz a 1200Hz (más amplio para voz)
+            const minPeriod = sampleRate / 1200; 
+            const maxPeriod = sampleRate / 50; 
 
             for (let tau = Math.floor(minPeriod); tau <= Math.floor(maxPeriod); tau++) {
                 let correlation = 0;
@@ -148,6 +168,7 @@
                 }
             }
 
+            // 4. Criterio de Calidad
             if (bestPeriod > 0 && maxCorr > (0.1 * size)) { 
                 return sampleRate / bestPeriod;
             }
@@ -160,25 +181,25 @@
             const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
             const targetFreq = midiToFreq(targetMidi);
             const noteIndex = targetMidi % 12;
-            targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + (Math.floor(targetMidi / 12) - 1);
+            const octave = Math.floor(targetMidi / 12) - 1;
+            targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
             return targetFreq;
         }
 
-        function updateProgress(cents) {
-            const absCents = Math.abs(cents);
+        function updateProgress(cents, isAccurate) {
             
-            if (absCents <= ACCURACY_THRESHOLD) {
+            if (isAccurate) {
                 // Ganar progreso por mantener el tono
                 userProgress += PROGRESS_RATE;
                 progressBar.classList.remove('bg-yellow-500', 'bg-red-500');
                 progressBar.classList.add('bg-emerald-500');
-            } else if (absCents <= 30) {
-                // Mantenimiento de progreso (cerca, pero no perfecto)
-                userProgress -= DECAY_RATE / 2;
+            } else if (Math.abs(cents) <= 30) {
+                // Cerca, progresión lenta/mantenimiento
+                userProgress += PROGRESS_RATE / 5;
                 progressBar.classList.remove('bg-emerald-500', 'bg-red-500');
                 progressBar.classList.add('bg-yellow-500');
             } else {
-                // Perder progreso por desafinar mucho
+                // Perder progreso por desafinar mucho o silencio
                 userProgress -= DECAY_RATE;
                 progressBar.classList.remove('bg-emerald-500', 'bg-yellow-500');
                 progressBar.classList.add('bg-red-500');
@@ -209,8 +230,14 @@
         function drawPitchVisual(cents, isPlaying) {
             canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
             const center = HEIGHT / 2;
+            const pixelsPerCent = HEIGHT / 100; // Mapear 100 cents (total visual) a la altura
             
-            // 1. Dibujar la línea de la Nota Objetivo
+            // 1. Dibujar la Banda de Afinación Correcta (+/- 10 cents)
+            const rangeY = ACCURACY_THRESHOLD; 
+            canvasCtx.fillStyle = 'rgba(16, 185, 129, 0.15)'; // Verde 500 con transparencia
+            canvasCtx.fillRect(0, center - (rangeY * pixelsPerCent), WIDTH, rangeY * pixelsPerCent * 2);
+
+            // 2. Dibujar la línea de la Nota Objetivo
             canvasCtx.strokeStyle = '#fcd34d'; // Amarillo 300
             canvasCtx.lineWidth = 3;
             canvasCtx.beginPath();
@@ -218,14 +245,6 @@
             canvasCtx.lineTo(WIDTH, center);
             canvasCtx.stroke();
             
-            // 2. Dibujar la Banda de Afinación Correcta (+/- 10 cents)
-            const rangeY = 10; // +- 10 cents para el rango de perfección
-            const pixelsPerCent = HEIGHT / 100; // Mapear 100 cents (total visual) a la altura
-
-            // Fondo tenue verde para el área "afinada"
-            canvasCtx.fillStyle = 'rgba(16, 185, 129, 0.1)'; // Verde 500 con transparencia
-            canvasCtx.fillRect(0, center - (rangeY * pixelsPerCent), WIDTH, rangeY * pixelsPerCent * 2);
-
             if (isPlaying) {
                 // Mapear los 100 cents (de -50 a +50) a la altura del canvas
                 let drawCents = Math.min(Math.max(cents, -50), 50); // Limitar a +/- 50 cents
@@ -248,15 +267,16 @@
                 canvasCtx.shadowColor = color;
                 canvasCtx.shadowBlur = 15;
                 canvasCtx.beginPath();
-                canvasCtx.arc(WIDTH / 2, dotY, 10, 0, 2 * Math.PI);
+                canvasCtx.arc(WIDTH / 2, dotY, 12, 0, 2 * Math.PI);
                 canvasCtx.fill();
                 canvasCtx.shadowBlur = 0; 
                 
             } else {
                 // Silencio o sin detección clara
                 canvasCtx.fillStyle = '#6b7280'; // Gris
-                canvasCtx.font = '20px Arial';
-                canvasCtx.fillText('Canta aquí', WIDTH / 2 - 40, center + 7);
+                canvasCtx.font = '20px sans-serif';
+                canvasCtx.textAlign = 'center';
+                canvasCtx.fillText('Canta para empezar', WIDTH / 2, center + 7);
             }
         }
 
@@ -290,14 +310,15 @@
                 frequencyDisplay.textContent = `${detectedFreq.toFixed(2)} Hz`;
 
                 // Actualizar Progreso
-                updateProgress(cents);
+                updateProgress(cents, Math.abs(cents) <= ACCURACY_THRESHOLD);
 
             } else {
                 // Silencio
                 detectedNoteDisplay.textContent = '---';
                 frequencyDisplay.textContent = '0.0 Hz';
+                amplitudeDisplay.textContent = '0.0000'; // Mostrar 0 en silencio
                 // El progreso decae suavemente
-                updateProgress(100); 
+                updateProgress(100, false); 
             }
 
             // Dibujar Canvas
@@ -336,6 +357,8 @@
 
             try {
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Asegurar que el AudioContext esté activo (soluciona problemas de suspensión del navegador)
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
@@ -362,7 +385,7 @@
 
             } catch (err) {
                 console.error("Error al acceder al micrófono:", err);
-                statusMessage.textContent = 'Error: No se pudo acceder al micrófono. (Puede que necesites recargar y dar permiso)';
+                statusMessage.textContent = 'Error: No se pudo acceder al micrófono. (Revisa la configuración de permisos del navegador)';
                 statusMessage.classList.remove('text-yellow-400');
                 statusMessage.classList.add('text-red-500');
                 startTunerButton.disabled = false;
