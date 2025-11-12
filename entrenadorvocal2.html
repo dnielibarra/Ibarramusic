@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Entrenador Vocal Dinámico</title>
+    <title>Entrenador Vocal Estable V3</title>
     <!-- Cargar Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Cargar Tone.js para la generación de sonido guía -->
@@ -16,14 +16,15 @@
             border-radius: 16px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
             border: 1px solid #374151;
+            max-width: 480px; /* Tamaño máximo para centrar en escritorio */
         }
         #pitch-canvas {
             background-color: #f7f7f7; /* Fondo de pentagrama blanco/claro */
             border-radius: 8px;
             margin-bottom: 20px;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
-            width: 100%; /* Asegurar que el canvas sea responsive */
-            height: 150px; /* Altura fija para el pentagrama */
+            width: 100%; 
+            height: 150px; 
         }
         /* Estilo para el input de radio */
         input[type="radio"]:checked + label {
@@ -32,52 +33,70 @@
             border-color: #10b981;
             box-shadow: 0 0 10px rgba(5, 150, 105, 0.5);
         }
+        .mic-status-off {
+             animation: pulse-red 1s infinite;
+        }
+        .mic-status-on {
+             animation: pulse-green 1s infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        }
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-full font-sans p-2 sm:p-4">
 
-    <div class="w-full max-w-lg text-center vocal-trainer-container p-6 sm:p-8">
-        <h1 class="text-2xl sm:text-3xl font-extrabold mb-1 text-emerald-400">🎤 Entrenador Vocal Dinámico</h1>
-        <p class="text-gray-400 mb-6 text-sm">Escucha, imita y afina tu voz en el pentagrama.</p>
+    <div class="w-full vocal-trainer-container p-6 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-extrabold mb-1 text-emerald-400">🎤 Entrenador Vocal Dinámico V3</h1>
+        <p class="text-gray-400 mb-4 text-sm">Afinación con sonido guía y visualización de tu voz en tiempo real.</p>
 
         <!-- Selección de Rango Vocal -->
-        <div class="mb-6 flex justify-center space-x-3">
-            <input type="radio" id="voice-low" name="voice-range" value="low" class="hidden" checked>
+        <div class="mb-4 flex justify-center space-x-3">
+            <input type="radio" id="voice-low" name="voice-range" value="-12" class="hidden" checked>
             <label for="voice-low" class="flex-1 px-3 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600 text-sm">Voz Baja (C3-G3)</label>
             
-            <input type="radio" id="voice-high" name="voice-range" value="high" class="hidden">
+            <input type="radio" id="voice-high" name="voice-range" value="0" class="hidden">
             <label for="voice-high" class="flex-1 px-3 py-2 border border-gray-500 rounded-lg cursor-pointer transition-all hover:bg-gray-600 text-sm">Voz Alta (C4-G4)</label>
         </div>
 
         <!-- Botón de Inicio y Controles -->
-        <button id="start-tuner-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-lg transition-all shadow-lg mb-4 disabled:bg-gray-600">
-            Iniciar Micrófono y Tono
+        <button id="start-tuner-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-lg transition-all shadow-lg mb-2 disabled:bg-gray-600">
+            Iniciar Micrófono y Tono Guía
         </button>
-        <p id="status-message" class="text-sm font-semibold h-4 mb-4 text-yellow-400">Pulsa para iniciar...</p>
+        <div class="flex items-center justify-between mb-4">
+            <div id="mic-status-light" class="w-4 h-4 rounded-full bg-red-500 mic-status-off transition-all"></div>
+            <p id="status-message" class="text-sm font-semibold h-4 text-yellow-400 text-left flex-1 ml-2">Pulsa para iniciar el audio...</p>
+            <button id="play-tone-button" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded-full text-xs transition-colors shadow-md disabled:opacity-50" disabled>
+                Escuchar Tono
+            </button>
+        </div>
 
         <!-- Contenedor de Pentagrama y Notas -->
         <div class="relative">
-            <!-- Canvas para Pentagrama y Bolas de Nota -->
             <canvas id="pitch-canvas" height="150"></canvas>
             
             <!-- Display de Nota y Frecuencia -->
             <div class="flex justify-between items-center px-2">
                 <div>
-                    <p class="text-sm text-gray-400">Nota a Cantar</p>
-                    <div id="target-note" class="text-3xl font-extrabold text-yellow-300">C4</div>
+                    <p class="text-sm text-gray-400">Nota Objetivo</p>
+                    <div id="target-note" class="text-3xl font-extrabold text-yellow-300">C3</div>
                 </div>
                 <div class="text-right">
                     <p class="text-xs text-gray-500" id="frequency-display">0.0 Hz</p>
                     <div id="detected-note" class="text-xl font-extrabold text-white">---</div>
-                    <p class="text-sm text-gray-400">Tu Voz</p>
+                    <p class="text-sm text-gray-400">Tu Voz Detectada</p>
                 </div>
             </div>
         </div>
 
-
         <!-- Barra de Progreso Motivacional -->
         <div class="mt-6">
-            <p class="text-md font-semibold text-emerald-400 mb-2">Progreso de Estabilidad:</p>
+            <p class="text-md font-semibold text-emerald-400 mb-2">Estabilidad de Afinación:</p>
             <div class="w-full bg-gray-600 rounded-full h-8 overflow-hidden shadow-inner">
                 <div id="progress-bar" class="h-8 bg-emerald-500 transition-all duration-300 ease-out flex items-center justify-center text-sm font-bold text-gray-900" style="width: 0%">
                     0%
@@ -92,33 +111,36 @@
         const MIDI_A4 = 69;
         const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         
-        // Escala ascendente de 5 notas (C, D, E, F, G)
+        // Escala ascendente de 5 notas: C, D, E, F, G (MIDI 60, 62, 64, 65, 67)
         const TARGET_MIDI_SCALE_C4 = [60, 62, 64, 65, 67]; 
         
         let currentTargetIndex = 0;
-        let targetMidiOffset = 0; // 0 para C4-G4 (Alto), -12 para C3-G3 (Bajo)
+        let targetMidiOffset = -12; // Inicia en C3 (Voz Baja)
+        let isTunerRunning = false;
 
         // --- Configuración de Audio y Detección ---
         let audioContext = null;
         let analyser = null;
         let dataArray = null;
-        let pitchDetectionInterval = null;
-        let synth = null; // Sintetizador para la nota guía
+        let synth = null; 
+        let mediaStream = null;
 
         // --- Variables de Estado y Progreso ---
         let userProgress = 0; 
-        const ACCURACY_THRESHOLD = 10; // +/- 10 cents es "perfecto"
+        const ACCURACY_THRESHOLD = 10; // +/- 10 cents (décimas de semitono)
         const PROGRESS_RATE = 0.5; 
         const DECAY_RATE = 0.15; 
 
         // --- Referencias DOM y Canvas ---
         const statusMessage = document.getElementById('status-message');
         const startTunerButton = document.getElementById('start-tuner-button');
+        const playToneButton = document.getElementById('play-tone-button');
         const detectedNoteDisplay = document.getElementById('detected-note');
         const targetNoteDisplay = document.getElementById('target-note');
         const frequencyDisplay = document.getElementById('frequency-display');
         const progressBar = document.getElementById('progress-bar');
         const voiceRangeInputs = document.querySelectorAll('input[name="voice-range"]');
+        const micStatusLight = document.getElementById('mic-status-light');
         const canvas = document.getElementById('pitch-canvas');
         const canvasCtx = canvas.getContext('2d');
         let WIDTH = canvas.width;
@@ -129,39 +151,20 @@
         function midiToFreq(midi) { return A4_FREQ * Math.pow(2, (midi - MIDI_A4) / 12); }
         function centsOff(freq, targetFreq) { return 1200 * Math.log2(freq / targetFreq); }
         
-        /** Mapea MIDI a posición Y en el pentagrama (ajustado para C4/C3 en el centro del staff) */
-        function midiToCanvasY(midi, centerMidi) {
-            // Cada línea/espacio es medio tono (6 pasos de semitono por línea)
-            // Usaremos C4 (60) o C3 (48) como punto de referencia.
-            // Una línea del pentagrama (staff line) debe representar un tono, y un espacio medio tono.
-            const totalRangeInCents = 100 * 12; // 12 semitonos, 100 cents cada uno
-            const pixelsPerCent = HEIGHT / totalRangeInCents * 4; // Ajuste para visualización
-            
-            // Usamos E4 (64) como línea central del pentagrama para mejor visualización
-            const staffCenterMidi = centerMidi + 4; // C4(60) -> E4(64), C3(48) -> E3(52)
-            const deviation = midi - staffCenterMidi; // Desviación en semitonos
-            
-            // 1 semitono = 100 cents. Mapeamos 100 cents a 1/4 de la altura de línea de staff
-            const lineHeight = 12; // Altura en píxeles de una línea del pentagrama
-            const spaceHeight = lineHeight / 2; // Altura de un espacio
-            
-            // La posición Y se calcula desde el centro del staff, cada semitono mueve la nota.
-            const center = HEIGHT / 2;
-            
-            // Un semitono es 1/2 espacio del pentagrama (la distancia visual)
-            // Mapeo inverso: semitonos más altos deben ser Y menor (más arriba)
-            const yOffset = -deviation * (spaceHeight / 2); // Ajuste fino del mapeo
-
-            return center + yOffset * 2.5; // Factor de zoom para que se vea bien
+        /** Convierte MIDI a string de nota (Ej: 60 -> C4) */
+        function midiToNoteString(midi) {
+            const noteIndex = midi % 12;
+            const octave = Math.floor(midi / 12) - 1;
+            return NOTE_NAMES[noteIndex] + octave;
         }
 
-
         /**
-         * Detección de tono por Autocorrelación simplificada (robusta).
+         * Detección de tono por Autocorrelación simplificada.
          */
         function getFundamentalFreq(buffer, sampleRate) {
+            // Implementación de Autocorrelación (mismo código que V2)
             const size = buffer.length;
-            const threshold = 0.01; // Umbral bajo para voz suave
+            const threshold = 0.01; 
             let startIndex = 0;
 
             for (let i = 0; i < size; i++) {
@@ -171,8 +174,6 @@
 
             let maxCorr = -1;
             let bestPeriod = -1;
-            
-            // Rango de búsqueda: 50Hz a 1200Hz
             const minPeriod = sampleRate / 1200; 
             const maxPeriod = sampleRate / 50; 
 
@@ -181,7 +182,6 @@
                 for (let i = startIndex; i < size - tau; i++) {
                     correlation += buffer[i] * buffer[i + tau];
                 }
-                // Normalización de la correlación (menos estricta)
                 let normalizedCorr = correlation / size;
 
                 if (normalizedCorr > maxCorr) {
@@ -190,7 +190,6 @@
                 }
             }
             
-            // Criterio de Calidad: maxCorr debe superar un umbral bajo pero consistente
             if (bestPeriod > 0 && maxCorr > 0.01) { 
                 return sampleRate / bestPeriod;
             }
@@ -199,21 +198,29 @@
 
         // --- Lógica del Ejercicio y Progreso ---
         
-        function updateTargetNote() {
+        function getCurrentTargetNote() {
             const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
-            const targetFreq = midiToFreq(targetMidi);
-            const noteIndex = targetMidi % 12;
-            const octave = Math.floor(targetMidi / 12) - 1;
-            targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
-
-            // Reproducir la nota guía
-            if (synth) {
-                synth.triggerAttackRelease(NOTE_NAMES[noteIndex] + octave, '8n');
-            }
-
-            return targetFreq;
+            return {
+                midi: targetMidi,
+                freq: midiToFreq(targetMidi),
+                name: midiToNoteString(targetMidi)
+            };
         }
 
+        function playTargetNote() {
+            const target = getCurrentTargetNote();
+            if (synth) {
+                 // Usa el nombre de la nota calculado
+                synth.triggerAttackRelease(target.name, '1n'); 
+                console.log(`Reproduciendo nota guía: ${target.name}`);
+            }
+        }
+
+        function updateTargetUI() {
+            const target = getCurrentTargetNote();
+            targetNoteDisplay.textContent = target.name;
+        }
+        
         function updateProgress(cents, isAccurate) {
             
             if (isAccurate) {
@@ -238,32 +245,27 @@
             if (userProgress >= 100) {
                 userProgress = 0; 
                 currentTargetIndex = (currentTargetIndex + 1) % TARGET_MIDI_SCALE_C4.length;
-                updateTargetNote(); // Mover a la siguiente nota de la escala
-                statusMessage.textContent = '¡Siguiente! 🎵 Mantén la nota...';
+                updateTargetUI(); // Actualiza la UI antes de reproducir
+                playTargetNote(); // Reproduce la nueva nota
+                statusMessage.textContent = '¡Siguiente! 🎵 Mantén la afinación...';
             }
         }
 
         // --- Funciones de Dibujo (Canvas) ---
         function resizeCanvas() {
-            // Asegurar que el canvas tome el ancho completo de su contenedor
             const container = canvas.parentElement.parentElement;
             WIDTH = container.clientWidth;
             canvas.width = WIDTH;
         }
 
-        /**
-         * Dibuja el pentagrama y las notas.
-         * @param {number} detectedMidi Nota MIDI detectada (redondeada).
-         * @param {number} cents Desviación en cents.
-         * @param {boolean} isPlaying Indica si se detectó un tono.
-         */
         function drawPitchVisual(detectedMidi, cents, isPlaying) {
             canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
             
-            const staffY = HEIGHT / 2; // Centro del pentagrama
-            const lineSpacing = 15; // Espacio entre líneas del pentagrama
+            const staffY = HEIGHT / 2; 
+            const lineSpacing = 15; 
             const noteRadius = 7;
-            const centerMidi = targetMidiOffset === 0 ? 60 : 48; // C4 o C3
+            const target = getCurrentTargetNote();
+            const centerMidi = targetMidiOffset === 0 ? 60 : 48; // C4 o C3 como referencia
 
             // 1. Dibujar las 5 líneas del Pentagrama (Staff Lines)
             canvasCtx.strokeStyle = '#000000';
@@ -275,17 +277,16 @@
                 canvasCtx.stroke();
             }
 
-            const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
-
             // 2. Dibujar la Nota Objetivo (Fija)
-            const targetY = staffY - (targetMidi - centerMidi - 4) * (lineSpacing / 2);
+            // Calculamos la posición Y. +4 es para centrar la visualización en la línea E (mi)
+            const targetY = staffY - (target.midi - centerMidi - 4) * (lineSpacing / 2);
             
-            canvasCtx.fillStyle = '#f59e0b'; // Amarillo
+            canvasCtx.fillStyle = '#f59e0b'; // Amarillo (borde)
             canvasCtx.beginPath();
             canvasCtx.arc(WIDTH / 4, targetY, noteRadius + 2, 0, 2 * Math.PI);
             canvasCtx.fill();
             
-            canvasCtx.fillStyle = '#fcd34d'; // Amarillo claro
+            canvasCtx.fillStyle = '#fcd34d'; // Amarillo claro (relleno)
             canvasCtx.beginPath();
             canvasCtx.arc(WIDTH / 4, targetY, noteRadius, 0, 2 * Math.PI);
             canvasCtx.fill();
@@ -293,20 +294,18 @@
             canvasCtx.font = 'bold 12px sans-serif';
             canvasCtx.textAlign = 'center';
             canvasCtx.fillStyle = '#1f2937'; 
-            canvasCtx.fillText('OBJETIVO', WIDTH / 4, targetY - 15);
+            canvasCtx.fillText(target.name, WIDTH / 4, targetY - 15);
 
 
             if (isPlaying) {
                 // 3. Dibujar la Nota Detectada (Dinámica, con desviación vertical)
                 
-                // Mapear la desviación de cents (-50 a +50) a un movimiento vertical dentro de un semitono
-                let drawCents = Math.min(Math.max(cents, -50), 50); 
+                let drawCents = Math.min(Math.max(cents, -50), 50); // Clamping para un semitono de visualización
                 
-                // Calcular la posición base MIDI (redondeada) en el pentagrama
+                // Posición base de la nota detectada (redondeada al semitono más cercano)
                 const baseDetectedY = staffY - (detectedMidi - centerMidi - 4) * (lineSpacing / 2);
                 
-                // Ajustar la posición Y de la nota detectada con la desviación en cents
-                // Cada semitono (lineSpacing/2) es 100 cents.
+                // Ajustar posición Y por la desviación en cents
                 const centDeviationY = (-drawCents / 100) * (lineSpacing / 2);
                 const finalDetectedY = baseDetectedY + centDeviationY;
                 
@@ -330,37 +329,33 @@
                 canvasCtx.fill();
                 canvasCtx.shadowBlur = 0; 
 
-                // Si la nota detectada cae en una línea imaginaria (entre las líneas del staff)
-                // y está fuera de la octava del pentagrama, no dibujamos líneas ledger, solo la bola.
-                // Aquí simplificamos el dibujo y solo mostramos la bola.
-
                 canvasCtx.font = 'bold 12px sans-serif';
                 canvasCtx.textAlign = 'center';
                 canvasCtx.fillStyle = '#ffffff'; 
-                canvasCtx.fillText('TU VOZ', WIDTH * 0.75, finalDetectedY - 15);
+                canvasCtx.fillText(midiToNoteString(detectedMidi), WIDTH * 0.75, finalDetectedY - 15);
 
                 
-            } else {
-                // Silencio o sin detección clara
-                canvasCtx.font = '20px sans-serif';
+            } else if (isTunerRunning) {
+                // Micrófono activo pero sin sonido
+                 canvasCtx.font = '18px sans-serif';
                 canvasCtx.textAlign = 'center';
                 canvasCtx.fillStyle = '#6b7280'; 
-                canvasCtx.fillText('Canta la nota guía para empezar', WIDTH / 2, staffY + 7);
+                canvasCtx.fillText('Esperando tu voz...', WIDTH / 2, staffY + 7);
             }
         }
 
         // --- Bucle Principal ---
         
         function tick() {
-            if (!analyser || !dataArray) {
-                pitchDetectionInterval = requestAnimationFrame(tick);
+            if (!isTunerRunning || !analyser || !dataArray) {
+                requestAnimationFrame(tick);
                 return;
             }
 
+            const target = getCurrentTargetNote();
             analyser.getFloatTimeDomainData(dataArray);
             const sampleRate = audioContext.sampleRate;
             
-            const targetFreq = midiToFreq(TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset);
             let detectedFreq = getFundamentalFreq(dataArray, sampleRate);
             let cents = 0;
             let detectedMidi = 0;
@@ -369,14 +364,11 @@
             if (detectedFreq > 0) {
                 isPlaying = true;
                 
-                cents = centsOff(detectedFreq, targetFreq);
+                cents = centsOff(detectedFreq, target.freq);
                 
-                // Actualizar UI de nota
                 const rawMidiNote = freqToMidi(detectedFreq);
                 detectedMidi = Math.round(rawMidiNote);
-                const noteIndex = detectedMidi % 12;
-                const octave = Math.floor(detectedMidi / 12) - 1;
-                detectedNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
+                
                 frequencyDisplay.textContent = `${detectedFreq.toFixed(2)} Hz`;
 
                 // Actualizar Progreso
@@ -387,55 +379,57 @@
                 detectedNoteDisplay.textContent = '---';
                 frequencyDisplay.textContent = '0.0 Hz';
                 detectedMidi = 0; 
+                // El progreso decae solo si no hay detección clara
                 updateProgress(100, false); 
             }
 
             // Dibujar Canvas
             drawPitchVisual(detectedMidi, cents, isPlaying);
             
-            pitchDetectionInterval = requestAnimationFrame(tick);
+            requestAnimationFrame(tick);
         }
 
         // --- Inicialización y Event Handlers ---
 
         function handleVoiceRangeChange(event) {
-            const range = event.target.value;
-            if (range === 'low') {
-                targetMidiOffset = -12; // Transponer a C3-G3
-            } else {
-                targetMidiOffset = 0; // Dejar en C4-G4
-            }
+            // El valor es el offset MIDI
+            targetMidiOffset = parseInt(event.target.value, 10); 
+            
             // Resetear
             currentTargetIndex = 0;
             userProgress = 0;
             progressBar.style.width = '0%';
             progressBar.textContent = '0%';
-            if (synth) { // Solo actualizar y reproducir si ya está iniciado
-                updateTargetNote();
-            } else {
-                 const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
-                 const noteIndex = targetMidi % 12;
-                 const octave = Math.floor(targetMidi / 12) - 1;
-                 targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
+            
+            updateTargetUI();
+
+            // Si el afinador ya está corriendo, reproducir la nueva nota guía
+            if (isTunerRunning && synth) { 
+                playTargetNote();
             }
         }
 
         voiceRangeInputs.forEach(input => {
             input.addEventListener('change', handleVoiceRangeChange);
         });
+        
+        playToneButton.addEventListener('click', () => {
+             // Iniciar Tone.js en el primer click si no se ha hecho
+            if (!synth) {
+                initAudioContext();
+            }
+            playTargetNote();
+        });
 
-        async function startTuner() {
-            startTunerButton.disabled = true;
-            statusMessage.textContent = 'Solicitando acceso al micrófono y creando sintetizador...';
 
+        async function initAudioContext() {
+            // Inicializar AudioContext y Tone.js
             try {
-                // 1. Inicializar AudioContext (robusto)
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
                 
-                // 2. Inicializar Sintetizador (Tone.js)
                 if (!synth) {
                     await Tone.start(); // Iniciar Tone.js
                     synth = new Tone.Synth({
@@ -443,9 +437,29 @@
                         envelope: { attack: 0.005, decay: 0.1, sustain: 0.2, release: 1 },
                     }).toDestination();
                 }
+                playToneButton.disabled = false;
+                
+            } catch (err) {
+                 console.error("Error al inicializar el AudioContext o Tone.js:", err);
+            }
+        }
 
-                // 3. Acceder al Micrófono
-                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        async function startTuner() {
+            if (isTunerRunning) return;
+
+            startTunerButton.disabled = true;
+            statusMessage.textContent = 'Iniciando micrófono...';
+            startTunerButton.textContent = 'Iniciando...';
+            
+            // 1. Asegurar Contexto de Audio
+            await initAudioContext();
+
+            try {
+                // 2. Acceder al Micrófono
+                if (!mediaStream) {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                }
                 
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 analyser = audioContext.createAnalyser();
@@ -453,38 +467,42 @@
                 dataArray = new Float32Array(analyser.fftSize);
 
                 source.connect(analyser);
-
-                statusMessage.textContent = 'Micrófono activo. ¡Escucha el tono y canta!';
-                startTunerButton.textContent = 'Afinador Activo y Tono Guía';
-                startTunerButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                startTunerButton.classList.add('bg-emerald-600');
                 
+                isTunerRunning = true;
+                statusMessage.textContent = '¡Micrófono Activo! Tono Guía listo.';
+                startTunerButton.textContent = 'Afinador Activo';
+                startTunerButton.classList.remove('bg-blue-600');
+                startTunerButton.classList.add('bg-emerald-600');
+                micStatusLight.classList.remove('bg-red-500', 'mic-status-off');
+                micStatusLight.classList.add('bg-emerald-500', 'mic-status-on');
+
                 // Iniciar la primera nota (que también la reproduce)
-                updateTargetNote();
+                updateTargetUI();
+                playTargetNote();
 
                 // Iniciar el bucle de detección de tono
                 tick(); 
 
             } catch (err) {
                 console.error("Error al acceder al micrófono:", err);
-                statusMessage.textContent = 'Error: No se pudo acceder al micrófono o iniciar el audio. (Revisa permisos)';
+                statusMessage.textContent = `ERROR: Acceso al micrófono denegado. Asegúrate de tener permisos. Detalles: ${err.name}`;
                 statusMessage.classList.remove('text-yellow-400');
                 statusMessage.classList.add('text-red-500');
                 startTunerButton.disabled = false;
-                startTunerButton.textContent = 'Reintentar';
+                startTunerButton.textContent = 'Reintentar Micrófono';
             }
         }
 
         startTunerButton.addEventListener('click', startTuner);
         
-        // Inicializar el tamaño del canvas y el display de la nota
+        // Inicializar el tamaño del canvas y el display de la nota inicial (C3)
         window.addEventListener('resize', resizeCanvas);
         document.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
-            const targetMidi = TARGET_MIDI_SCALE_C4[currentTargetIndex] + targetMidiOffset;
-            const noteIndex = targetMidi % 12;
-            const octave = Math.floor(targetMidi / 12) - 1;
-            targetNoteDisplay.textContent = NOTE_NAMES[noteIndex] + octave;
+            // Inicializar el offset y la UI
+            handleVoiceRangeChange({ target: { value: '-12' } }); 
+            // Iniciar el bucle de renderizado del canvas inmediatamente (para dibujar staff)
+            requestAnimationFrame(tick);
         });
 
     </script>
