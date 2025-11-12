@@ -21,6 +21,8 @@
         #meter-needle {
             transform-origin: 50% 100%;
             transition: transform 0.1s ease-out; /* Suaviza el movimiento */
+            /* Inicia la aguja en el centro (0 grados) */
+            transform: rotate(0deg); 
         }
 
         /* Colores del dial */
@@ -162,9 +164,8 @@
 
         // Estabilidad y Precisión
         const ACCURACY_THRESHOLD = 8; // +/- 8 cents (para el color verde)
-        // ** VALORES AJUSTADOS PARA MAYOR ESTABILIDAD (STICKINESS) **
         const PROGRESS_RATE_STICKY = 3.0; // Velocidad de aumento (hace que el verde se "pegue")
-        const DECAY_RATE = 0.3; // Velocidad de disminución
+        const DECAY_RATE = 0.5; // Velocidad de disminución (Ajustada para ser más rápida que antes)
 
         // Estado interno para el progreso de afinación
         let greenPersistence = 0; // 0 a 100
@@ -191,7 +192,6 @@
 
         /**
          * Detección de tono usando Autocorrelación simplificada.
-         * (Optimizado para funcionar bien en el rango de guitarra/ukelele)
          */
         function getFundamentalFreq(buffer, sampleRate) {
             const size = buffer.length;
@@ -207,16 +207,20 @@
             let maxCorr = -1;
             let bestPeriod = -1;
             
-            // Rango de frecuencias de 50 Hz (E1/Ukulele grave) a 1200 Hz (Armónico alto)
+            // Rango de frecuencias de 50 Hz a 1200 Hz
             const minPeriod = sampleRate / 1200; 
             const maxPeriod = sampleRate / 50; 
 
             for (let tau = Math.floor(minPeriod); tau <= Math.floor(maxPeriod); tau++) {
                 let correlation = 0;
-                for (let i = startIndex; i < size - tau; i++) {
+                // Usamos un tamaño de ventana de correlación fijo (ej. 1024 muestras)
+                const correlationWindow = Math.min(size - tau, 1024); 
+                for (let i = startIndex; i < startIndex + correlationWindow; i++) {
                     correlation += buffer[i] * buffer[i + tau];
                 }
-                let normalizedCorr = correlation / (size - tau); // Normalización mejorada
+                
+                // Normalización simple basada en la amplitud de la señal de inicio
+                let normalizedCorr = correlation / correlationWindow; 
 
                 if (normalizedCorr > maxCorr) {
                     maxCorr = normalizedCorr;
@@ -224,8 +228,10 @@
                 }
             }
             
-            // Usamos un umbral de correlación más alto para evitar ruido
-            if (bestPeriod > 0 && maxCorr > 0.1) { 
+            // Ajustar el umbral de correlación para evitar ruido
+            if (bestPeriod > 0 && maxCorr > 0.15) { 
+                // Mejorar la precisión con interpolación parabólica (opcional pero ayuda)
+                // Esto es solo un ejemplo de auto-correlación, puede ser ruidoso.
                 return sampleRate / bestPeriod;
             }
             return 0; 
@@ -261,7 +267,7 @@
                 button.dataset.index = index;
                 button.onclick = () => {
                     currentStringIndex = index;
-                    // Resetear la persistencia al cambiar de cuerda para evitar confusión
+                    // Resetear la persistencia al cambiar de cuerda
                     greenPersistence = 0; 
                     updateDisplay(0, 0, false); 
                     updateStringButtons(); 
@@ -271,8 +277,8 @@
 
             // Actualizar la nota objetivo principal
             noteDisplay.textContent = tuning.names[currentStringIndex];
-            noteDisplay.classList.add('text-white');
             noteDisplay.classList.remove('text-emerald-400', 'text-yellow-400', 'text-red-400');
+            noteDisplay.classList.add('text-white');
         }
 
         function updateDisplay(cents, detectedFreq, isPlaying) {
@@ -286,11 +292,11 @@
                 // Aumenta la persistencia rápidamente si está afinado
                 greenPersistence = Math.min(100, greenPersistence + PROGRESS_RATE_STICKY);
             } else if (isPlaying) {
-                 // Disminuye lentamente si está cantando, pero fuera del rango 'pegado'
+                // Disminuye lentamente si está cantando, pero fuera del rango 'pegado'
                 greenPersistence = Math.max(0, greenPersistence - DECAY_RATE);
             } else {
-                 // Disminuye más rápido si hay silencio o no hay detección (para que vuelva a empezar)
-                greenPersistence = Math.max(0, greenPersistence - (DECAY_RATE * 1.5));
+                // Disminuye más rápido si hay silencio o no hay detección
+                greenPersistence = Math.max(0, greenPersistence - (DECAY_RATE * 2));
             }
             
             const isGreenSticky = greenPersistence > 50; 
@@ -317,20 +323,19 @@
 
             const currentTargetName = getTarget().name;
 
-            // Solo actualizar si el estado cambió o si la nota no coincide
-            if (!noteDisplay.classList.contains(colorClass) || noteDisplay.textContent !== currentTargetName) {
-                noteDisplay.className = `text-6xl sm:text-8xl font-extrabold mb-2 transition-colors duration-300 ${colorClass}`;
-                noteDisplay.textContent = currentTargetName;
-            }
+            // Actualizar el color y la nota
+            noteDisplay.className = `text-6xl sm:text-8xl font-extrabold mb-2 transition-colors duration-300 ${colorClass}`;
+            noteDisplay.textContent = currentTargetName;
             
             if (isGreenSticky) {
-                statusMessage.textContent = `¡AFINADO! ✅ Peristencia: ${greenPersistence.toFixed(0)}%`;
+                statusMessage.textContent = `¡AFINADO! ✅ (Persistencia: ${greenPersistence.toFixed(0)}%)`;
                 statusMessage.classList.add('text-emerald-400');
                 statusMessage.classList.remove('text-yellow-400', 'text-red-400');
             } else if (isPlaying) {
-                statusMessage.textContent = `${cents.toFixed(1)} cents`;
-                 statusMessage.classList.remove('text-emerald-400');
-                 statusMessage.classList.add(Math.abs(cents) <= 20 ? 'text-yellow-400' : 'text-red-400');
+                // Muestra la desviación de cents si está cerca o lejos
+                statusMessage.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(1)} cents`;
+                statusMessage.classList.remove('text-emerald-400');
+                statusMessage.classList.add(Math.abs(cents) <= 20 ? 'text-yellow-400' : 'text-red-400');
             } else {
                 statusMessage.textContent = 'Micrófono activo. Toca la cuerda.';
                 statusMessage.classList.add('text-yellow-400');
@@ -371,44 +376,37 @@
 
         // --- Inicialización y Event Handlers ---
 
-        async function initAudioContext() {
-            try {
-                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-            } catch (err) {
-                 console.error("Error al inicializar el AudioContext:", err);
-            }
-        }
-
         async function startTuner() {
-            if (isTunerRunning) return;
-
             startTunerButton.disabled = true;
             statusMessage.textContent = 'Iniciando micrófono...';
             startTunerButton.textContent = 'Iniciando...';
             
-            await initAudioContext();
-
             try {
-                // Acceder al Micrófono
+                // 1. Inicializar AudioContext (siempre después del primer gesto del usuario)
+                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                // 2. Acceder al Micrófono
                 if (!mediaStream) {
                     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                }
-                
-                const source = audioContext.createMediaStreamSource(mediaStream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 4096; // Mayor FFT size para mejor resolución de baja frecuencia
-                dataArray = new Float32Array(analyser.fftSize);
+                    const source = audioContext.createMediaStreamSource(mediaStream);
+                    
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 4096; // Mayor FFT size para mejor resolución de baja frecuencia
+                    dataArray = new Float32Array(analyser.fftSize);
 
-                source.connect(analyser);
+                    source.connect(analyser);
+                }
                 
                 isTunerRunning = true;
                 statusMessage.textContent = '¡Micrófono Activo! Toca la cuerda.';
-                startTunerButton.textContent = 'Afinador Activo';
-                startTunerButton.classList.remove('bg-blue-600');
-                startTunerButton.classList.add('bg-emerald-600');
+                startTunerButton.textContent = 'DETENER Afinador';
+                startTunerButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                startTunerButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                startTunerButton.disabled = false;
+                
                 micStatusLight.classList.remove('bg-red-500', 'mic-status-off');
                 micStatusLight.classList.add('bg-emerald-500', 'mic-status-on');
 
@@ -422,12 +420,53 @@
                 statusMessage.textContent = `ERROR: Acceso al micrófono denegado. Asegúrate de tener permisos.`;
                 statusMessage.classList.remove('text-yellow-400');
                 statusMessage.classList.add('text-red-500');
+                
+                // Si falla, limpiar y restablecer el botón
                 startTunerButton.disabled = false;
                 startTunerButton.textContent = 'Reintentar Micrófono';
+                startTunerButton.classList.remove('bg-emerald-600', 'bg-red-600');
+                startTunerButton.classList.add('bg-blue-600');
                 micStatusLight.classList.remove('bg-emerald-500', 'mic-status-on');
                 micStatusLight.classList.add('bg-red-500', 'mic-status-off');
+                isTunerRunning = false;
             }
         }
+        
+        function stopTuner() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            isTunerRunning = false;
+            greenPersistence = 0;
+            
+            updateDisplay(0, 0, false);
+            
+            statusMessage.textContent = 'Pulsa para iniciar la detección de tono...';
+            statusMessage.classList.add('text-yellow-400');
+            statusMessage.classList.remove('text-emerald-400', 'text-red-400');
+            
+            startTunerButton.textContent = 'Iniciar Micrófono';
+            startTunerButton.classList.remove('bg-emerald-600', 'bg-red-600');
+            startTunerButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            
+            micStatusLight.classList.remove('bg-emerald-500', 'mic-status-on');
+            micStatusLight.classList.add('bg-red-500', 'mic-status-off');
+        }
+
+        function toggleTuner() {
+            if (isTunerRunning) {
+                stopTuner();
+            } else {
+                startTuner();
+            }
+        }
+
 
         function setInstrument(instrumentKey) {
             document.getElementById(`select-${currentInstrument}`).classList.remove('selected');
@@ -443,13 +482,12 @@
         }
 
         // --- Event Listeners Globales ---
-        startTunerButton.addEventListener('click', startTuner);
+        startTunerButton.addEventListener('click', toggleTuner); // Ahora llama al toggle
         document.getElementById('select-guitar').addEventListener('click', () => setInstrument('guitar'));
         document.getElementById('select-ukulele').addEventListener('click', () => setInstrument('ukulele'));
 
         // Inicialización al cargar
         document.addEventListener('DOMContentLoaded', () => {
-            // Establecer el instrumento inicial y actualizar botones
             setInstrument('guitar');
             // Iniciar el bucle de renderizado para mostrar la UI vacía
             tick(); 
