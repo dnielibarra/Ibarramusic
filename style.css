@@ -1,1 +1,136 @@
-y
+:root {
+  --fondo: #101214;
+  --tarjeta: #1b1f23;
+  --texto: #f5f5f5;
+  --suave: #a9b0b8;
+  --dorado: #d9aa45;
+  --azul: #2d6f73;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+header {
+  text-align: center;
+  padding: 22px 14px 12px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--dorado);
+}
+
+header p {
+  margin: 5px 0 0;
+  color: var(--suave);
+}
+
+main {
+  padding: 14px;
+  max-width: 720px;
+  margin: auto;
+}
+
+#buscador {
+  width: 100%;
+  padding: 13px;
+  border-radius: 14px;
+  border: none;
+  margin-bottom: 14px;
+  font-size: 16px;
+}
+
+#etiquetas,
+#chipsCancion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #263039;
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.chip.activa {
+  background: var(--dorado);
+  color: #111;
+  font-weight: bold;
+}
+
+.cancion {
+  background: var(--tarjeta);
+  padding: 14px;
+  border-radius: 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.cancion h3 {
+  margin: 0;
+  color: var(--dorado);
+}
+
+.cancion p {
+  margin: 5px 0 0;
+  color: var(--suave);
+}
+
+.btn-volver {
+  background: none;
+  border: none;
+  color: var(--dorado);
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+#vistaCancion h2 {
+  color: var(--dorado);
+  margin-bottom: 4px;
+}
+
+#autorCancion,
+#tonoCancion {
+  color: var(--suave);
+  margin: 3px 0;
+}
+
+.acciones-texto {
+  display: flex;
+  gap: 14px;
+  margin: 18px 0 10px;
+  color: var(--dorado);
+  font-weight: 600;
+}
+
+.acciones-texto span {
+  cursor: pointer;
+}
+
+pre {
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 17px;
+  line-height: 1.55;
+  background: #15181b;
+  padding: 14px;
+  border-radius: 16px;
+  overflow-x: auto;
+}
+
+.oculto {
+  display: none;
+}y
