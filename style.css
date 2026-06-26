@@ -128,7 +128,6 @@ main {
 }
 
 pre {
-  white-space: normal;
   font-family: monospace;
   font-size: 17px;
   line-height: 1.55;
@@ -136,6 +135,17 @@ pre {
   padding: 14px;
   border-radius: 16px;
   overflow-x: auto;
+}
+
+/* Letra con acordes */
+#letraCancion {
+  white-space: normal;
+}
+
+/* Tablatura y notas */
+#tablaturaCancion,
+#notasCancion {
+  white-space: pre;
 }
 
 .oculto {
