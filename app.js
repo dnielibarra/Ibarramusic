@@ -126,5 +126,40 @@ function volver() {
   document.getElementById("inicio").classList.remove("oculto");
 }
 
+function formatearAcordes(texto) {
+  return texto
+    .trim()
+    .split("\n")
+    .map(linea => {
+      if (!linea.includes("[")) {
+        return `<div class="linea-simple">${linea}</div>`;
+      }
+
+      let acordes = "";
+      let letra = "";
+      let pos = 0;
+
+      const partes = linea.split(/(\[[^\]]+\])/g);
+
+      partes.forEach(parte => {
+        if (parte.startsWith("[") && parte.endsWith("]")) {
+          const acorde = parte.slice(1, -1);
+          acordes += " ".repeat(Math.max(letra.length - pos, 0)) + acorde;
+          pos = letra.length + acorde.length;
+        } else {
+          letra += parte;
+        }
+      });
+
+      return `
+        <div class="linea-canto">
+          <div class="linea-acordes">${acordes}</div>
+          <div class="linea-letra">${letra}</div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 renderEtiquetas();
 renderCanciones();
