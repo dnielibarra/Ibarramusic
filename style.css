@@ -121,7 +121,7 @@ main {
 }
 
 pre {
-  white-space: pre-wrap;
+  white-space: normal;
   font-family: monospace;
   font-size: 17px;
   line-height: 1.55;
@@ -133,4 +133,31 @@ pre {
 
 .oculto {
   display: none;
+}
+
+#lineaCancion,
+#letraCancion {
+  font-family: monospace;
+}
+
+.linea-canto {
+  margin-bottom: 10px;
+}
+
+.linea-acordes {
+  color: var(--dorado);
+  font-weight: bold;
+  white-space: pre;
+  line-height: 1.1;
+}
+
+.linea-letra {
+  color: var(--texto);
+  white-space: pre-wrap;
+  line-height: 1.2;
+}
+
+.linea-simple {
+  white-space: pre-wrap;
+  margin-bottom: 8px;
 }
