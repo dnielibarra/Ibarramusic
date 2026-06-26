@@ -1,1 +1,52 @@
-e
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ibarra Music</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>🎵 Ibarra Music</h1>
+  <p>Tu música, nuestra historia</p>
+</header>
+
+<main>
+  <section id="inicio">
+    <input id="buscador" type="text" placeholder="Buscar canción...">
+
+    <div id="etiquetas"></div>
+
+    <div id="listaCanciones"></div>
+  </section>
+
+  <section id="vistaCancion" class="oculto">
+    <button class="btn-volver" onclick="volver()">← Volver</button>
+
+    <h2 id="tituloCancion"></h2>
+    <p id="autorCancion"></p>
+    <p id="tonoCancion"></p>
+
+    <div id="chipsCancion"></div>
+
+    <div class="acciones-texto">
+      <span onclick="mostrarSeccion('letra')">Letra</span>
+      <span id="tabTablatura" onclick="mostrarSeccion('tablatura')">Tablatura</span>
+      <span id="tabNotas" onclick="mostrarSeccion('notas')">Notas</span>
+    </div>
+
+    <pre id="letraCancion"></pre>
+    <pre id="tablaturaCancion" class="oculto"></pre>
+    <pre id="notasCancion" class="oculto"></pre>
+  </section>
+</main>
+
+<script src="baladas.js"></script>
+<script src="rancheras.js"></script>
+<script src="rock.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>e
