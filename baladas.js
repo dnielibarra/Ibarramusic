@@ -5,7 +5,7 @@ const baladas = [
     tono: "G",
     etiquetas: ["Balada", "Familiar"],
     letra: `
-[Est[G]a es una canción de ejemplo
+Est[G]a es una canción de ejemplo
 [D]para probar Ibarra Music
 [Em]con acordes y etiquetas
 [C]muy fácil de encontrar.
