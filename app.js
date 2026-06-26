@@ -85,7 +85,7 @@ function abrirCancion(cancion) {
 
   document.getElementById("letraCancion").textContent = cancion.letra || "";
   document.getElementById("tablaturaCancion").textContent = cancion.tablatura || "";
-  document.getElementById("notasCancion").textContent = cancion.notas || "";
+  document.getElementById("letraCancion").innerHTML = formatearAcordes(cancion.letra || "");
 
   document.getElementById("tabTablatura").style.display = cancion.tablatura ? "inline" : "none";
   document.getElementById("tabNotas").style.display = cancion.notas ? "inline" : "none";
