@@ -163,3 +163,24 @@ function formatearAcordes(texto) {
 
 renderEtiquetas();
 renderCanciones();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js");
+}
+
+function buscarActualizacion() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg) {
+        reg.update().then(() => {
+          alert("Buscando actualización. La app se recargará.");
+          location.reload();
+        });
+      } else {
+        location.reload();
+      }
+    });
+  } else {
+    location.reload();
+  }
+}
