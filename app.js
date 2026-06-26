@@ -127,4 +127,4 @@ function volver() {
 }
 
 renderEtiquetas();
-renderCanciones();y
+renderCanciones();
