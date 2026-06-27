@@ -83,12 +83,7 @@ function abrirCancion(cancion) {
   document.getElementById("autorCancion").textContent = cancion.autor || "";
   document.getElementById("tonoCancion").textContent = "Tono: " + (cancion.tono || "-");
 
-  document.getElementById("letraCancion").innerHTML = formatearAcordes(cancion.letra || "");
-document.getElementById("tablaturaCancion").textContent = cancion.tablatura || "";
-document.getElementById("notasCancion").textContent = cancion.notas || "";
-
-  document.getElementById("tabTablatura").style.display = cancion.tablatura ? "inline" : "none";
-  document.getElementById("tabNotas").style.display = cancion.notas ? "inline" : "none";
+  
 
   const chips = document.getElementById("chipsCancion");
   chips.innerHTML = "";
@@ -100,24 +95,57 @@ document.getElementById("notasCancion").textContent = cancion.notas || "";
     chips.appendChild(chip);
   });
 
-  mostrarSeccion("letra");
+  crearSecciones(cancion);
 }
 
-function mostrarSeccion(seccion) {
-  document.getElementById("letraCancion").classList.add("oculto");
-  document.getElementById("tablaturaCancion").classList.add("oculto");
-  document.getElementById("notasCancion").classList.add("oculto");
+const seccionesDisponibles = [
+  { clave: "letra", nombre: "Letra", tipo: "acordes" },
+  { clave: "tablatura", nombre: "Tablatura", tipo: "pre" },
+  { clave: "notas", nombre: "Notas", tipo: "pre" },
+  { clave: "intro", nombre: "Intro", tipo: "pre" },
+  { clave: "solo", nombre: "Solo", tipo: "pre" },
+  { clave: "arreglo", nombre: "Arreglo", tipo: "pre" },
+  { clave: "historia", nombre: "Historia", tipo: "pre" }
+];
 
-  if (seccion === "letra") {
-    document.getElementById("letraCancion").classList.remove("oculto");
-  }
+function crearSecciones(cancion) {
+  const tabs = document.getElementById("tabsSecciones");
+  const contenido = document.getElementById("contenidoSeccion");
 
-  if (seccion === "tablatura") {
-    document.getElementById("tablaturaCancion").classList.remove("oculto");
-  }
+  tabs.innerHTML = "";
+  contenido.innerHTML = "";
 
-  if (seccion === "notas") {
-    document.getElementById("notasCancion").classList.remove("oculto");
+  const seccionesConContenido = seccionesDisponibles.filter(sec => {
+    return cancion[sec.clave] && cancion[sec.clave].trim() !== "";
+  });
+
+  seccionesConContenido.forEach((sec, index) => {
+    const tab = document.createElement("span");
+    tab.textContent = sec.nombre;
+    tab.onclick = () => mostrarSeccion(sec, cancion, tab);
+    tabs.appendChild(tab);
+
+    if (index === 0) {
+      mostrarSeccion(sec, cancion, tab);
+    }
+  });
+}
+
+function mostrarSeccion(sec, cancion, tabActivo) {
+  const tabs = document.querySelectorAll("#tabsSecciones span");
+  const contenido = document.getElementById("contenidoSeccion");
+
+  tabs.forEach(t => t.classList.remove("activo"));
+  tabActivo.classList.add("activo");
+
+  if (sec.tipo === "acordes") {
+    contenido.innerHTML = `
+      <pre id="letraCancion">${formatearAcordes(cancion[sec.clave])}</pre>
+    `;
+  } else {
+    contenido.innerHTML = `
+      <pre class="bloque-pre">${cancion[sec.clave]}</pre>
+    `;
   }
 }
 
