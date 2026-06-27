@@ -1,7 +1,7 @@
 const baladas = [
   {
-    titulo: "Y volvere <Emporte moi>",
-    autor: "<Alain Barriere,> Germain de lamfiente",
+    titulo: "Y volvere",
+    autor: "Germain de lamfiente",
     tono: "Am",
     etiquetas: ["Balada", "Familiar", "(1969)"],
     letra: `
@@ -65,6 +65,6 @@ D|---0-2---2-0-----|
 A|-3-----------3---|
 E|-----------------|
 `,
-    notas: "Aquí puedes poner indicaciones para ensayo."
+    notas: "Está es una canción italiana que se llama Emporte moi compuesta por Alain Barriere que después Germain escribió la letra en español.."
   }
 ];
