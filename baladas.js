@@ -1,9 +1,4 @@
 const baladas = [
-  {
-
-
-    notas: "Está es una canción italiana que se llama Emporte moi compuesta por Alain Barriere que después Germain escribió la letra en español.."
-  },
 {
   titulo: "Y volvere",
   autor: "Germain de la fuente",
@@ -72,6 +67,6 @@ D|---0-2---2-0---0----------|
 A|-3-----------3---3--2--3--|
 E|--------------------------|
 `,
-  historia: `...`
+  historia: `Está es una canción italiana que se llama Emporte moi compuesta por Alain Barriere que después Germain escribió la letra en español..`
 }
 ];
