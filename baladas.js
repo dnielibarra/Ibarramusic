@@ -3,7 +3,7 @@ const baladas = [
     titulo: "Y volvere <Emporte moi>",
     autor: "<Alain Barriere,> Germain de lamfiente",
     tono: "Am",
-    etiquetas: ["Balada", "Familiar, "1969)],
+    etiquetas: ["Balada", "Familiar", "(1969)"],
     letra: `
 Amor, adiós
 No se puede continuar
