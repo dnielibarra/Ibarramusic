@@ -1,7 +1,7 @@
 const baladas = [
   {
     titulo: "Y volvere",
-    autor: "Germain de lamfiente",
+    autor: "Germain de la fuente",
     tono: "Am",
     etiquetas: ["Balada", "Familiar", "(1969)"],
     letra: `
