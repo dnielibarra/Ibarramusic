@@ -1,7 +1,7 @@
 const baladas = [
   {
     titulo: "Y volvere",
-    autor: "Germain de la fuente",
+    autor: "Los Angeles Negros",
     tono: "Am",
     etiquetas: ["Balada", "Familiar", "(1969)"],
     letra: `
