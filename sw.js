@@ -1,4 +1,4 @@
-const CACHE_NAME = "ibarra-music-v1.0.2";
+const CACHE_NAME = "ibarra-music-v1.0.3";
 
 const FILES_TO_CACHE = [
   "./",
