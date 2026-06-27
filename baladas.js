@@ -58,5 +58,18 @@ E|-----------------|
 `,
 
     notas: "Está es una canción italiana que se llama Emporte moi compuesta por Alain Barriere que después Germain escribió la letra en español.."
-  }
+  },
+{
+  titulo: "Y volvere",
+  autor: "Germain de la fuente",
+  tono: "Am",
+  etiquetas: ["Balada", "Familiar", "(1969)"],
+
+  letra: `...`,
+  tablatura: `...`,
+  notas: `...`,
+  intro: `...`,
+  solo: `...`,
+  historia: `...`
+}
 ];
