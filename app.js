@@ -83,9 +83,9 @@ function abrirCancion(cancion) {
   document.getElementById("autorCancion").textContent = cancion.autor || "";
   document.getElementById("tonoCancion").textContent = "Tono: " + (cancion.tono || "-");
 
-  document.getElementById("letraCancion").textContent = cancion.letra || "";
-  document.getElementById("tablaturaCancion").textContent = cancion.tablatura || "";
   document.getElementById("letraCancion").innerHTML = formatearAcordes(cancion.letra || "");
+document.getElementById("tablaturaCancion").textContent = cancion.tablatura || "";
+document.getElementById("notasCancion").textContent = cancion.notas || "";
 
   document.getElementById("tabTablatura").style.display = cancion.tablatura ? "inline" : "none";
   document.getElementById("tabNotas").style.display = cancion.notas ? "inline" : "none";
