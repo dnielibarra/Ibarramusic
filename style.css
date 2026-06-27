@@ -178,3 +178,26 @@ pre {
   white-space: pre-wrap;
   margin-bottom: 8px;
 }
+
+
+.acciones-texto span.activo {
+  border-bottom: 2px solid var(--dorado);
+}
+
+#contenidoSeccion pre {
+  font-family: monospace;
+  font-size: 17px;
+  line-height: 1.55;
+  background: #15181b;
+  padding: 14px;
+  border-radius: 16px;
+  overflow-x: auto;
+}
+
+#letraCancion {
+  white-space: normal;
+}
+
+.bloque-pre {
+  white-space: pre;
+}
