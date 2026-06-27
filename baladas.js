@@ -3,7 +3,7 @@ const baladas = [
   titulo: "Y volvere",
   autor: "Germain de la fuente",
   tono: "Am",
-  etiquetas: ["Balada", "Familiar", "(1969)"],
+  etiquetas: ["Balada", "Familiar"],
 
   letra: `
 Amor, adiós
