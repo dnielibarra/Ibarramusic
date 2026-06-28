@@ -1,0 +1,111 @@
+:root {
+  --fondo: #101214;
+  --tarjeta: #1b1f23;
+  --texto: #f5f5f5;
+  --suave: #a9b0b8;
+  --dorado: #d9aa45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+header {
+  text-align: center;
+  padding: 22px 14px 10px;
+}
+
+header h1 {
+  margin: 0;
+  color: var(--dorado);
+  font-size: 25px;
+}
+
+header p {
+  margin: 6px 0 0;
+  color: var(--suave);
+}
+
+main {
+  padding: 14px;
+  max-width: 760px;
+  margin: auto;
+}
+
+.card {
+  background: var(--tarjeta);
+  padding: 14px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+}
+
+h2 {
+  margin-top: 0;
+  color: var(--dorado);
+  font-size: 18px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+textarea {
+  min-height: 170px;
+  font-family: monospace;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 11px 14px;
+  background: #263039;
+  color: var(--texto);
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+button.principal {
+  background: var(--dorado);
+  color: #111;
+}
+
+.fila {
+  display: flex;
+  gap: 8px;
+}
+
+.fila input {
+  flex: 1;
+}
+
+.chip {
+  display: inline-block;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #263039;
+  margin: 4px;
+  color: var(--texto);
+}
+
+.seccion {
+  margin-top: 12px;
+}
+
+.seccion h3 {
+  color: var(--dorado);
+  margin-bottom: 6px;
+}
