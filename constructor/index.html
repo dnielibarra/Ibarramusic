@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Constructor de Canciones</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>🎵 Constructor Ibarra Music</h1>
+  <p>Crea canciones listas para pegar en tu app</p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>Datos principales</h2>
+
+    <input id="titulo" placeholder="Título">
+    <input id="autor" placeholder="Autor">
+    <input id="tono" placeholder="Tono original, ejemplo: Am">
+
+    <div class="fila">
+      <input id="etiquetaInput" placeholder="Agregar etiqueta">
+      <button onclick="agregarEtiqueta()">+</button>
+    </div>
+
+    <div id="listaEtiquetas"></div>
+  </section>
+
+  <section class="card">
+    <h2>Secciones</h2>
+
+    <select id="tipoSeccion">
+      <option value="letra">Letra</option>
+      <option value="tablatura">Tablatura</option>
+      <option value="intro">Intro</option>
+      <option value="solo">Solo</option>
+      <option value="arreglo">Arreglo</option>
+      <option value="notas">Notas</option>
+      <option value="historia">Historia</option>
+    </select>
+
+    <button onclick="agregarSeccion()">Agregar sección</button>
+
+    <div id="contenedorSecciones"></div>
+  </section>
+
+  <section class="card">
+    <h2>Partitura</h2>
+
+    <input id="youtube" placeholder="Link de YouTube">
+    <input id="pdf" placeholder="Link del PDF en Google Drive">
+  </section>
+
+  <section class="card">
+    <button class="principal" onclick="generarCodigo()">Generar código</button>
+    <button onclick="copiarCodigo()">Copiar código</button>
+
+    <textarea id="resultado" placeholder="Aquí aparecerá el código generado"></textarea>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
