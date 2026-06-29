@@ -12,7 +12,7 @@ Ya la magia termin[Bb]o  [E]
 Ahora tengo que march[Am]ar
 Ser[A7]á mej[Dm]or [G7]
 Seguir nuestra soled[Bb]ad  [F]
-Si hoy el cielo se cubri[Bb]ó  [E]
+Si hoy el cielo se nubl[Bb]o  [E]
 Quizás mañana brille el s[Am]ol  [A7]
 No sufras más
 Quizás mañana
