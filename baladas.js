@@ -6,9 +6,9 @@ const baladas = [
   etiquetas: ["Balada", "Familiar"],
 
   letra: `
-Amor, adiós
-No se puede continuar
-Ya la magia termino
+Am[A7]or, adi[Dm]ós  [G]
+No se puede contin[C]uar  [F]
+Ya la magia termin[Bb]o
 Ahora tengo que marchar
 Será mejor
 Seguir nuestra soledad
