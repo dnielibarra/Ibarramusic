@@ -6,6 +6,7 @@ const baladas = [
   etiquetas: ["Balada", "Familiar"],
 
   letra: `
+[verso]
 [Am]
 Am[A7]or, adi[Dm]ós  [G7]
 No se puede contin[C]uar  [F]
@@ -15,6 +16,8 @@ Ser[A7]á mej[Dm]or [G7]
 Seguir nuestra soled[Bb]ad  [F]
 Si hoy el cielo se nubl[Bb]o  [E]
 Quizás mañana brille el s[Am]ol  [A7]
+
+[coro 1]
 No sufras m[Dm]ás  [G7]
 Quizás mañana
 nuestro ll[C]anto quede atrás  [F]
@@ -22,6 +25,8 @@ Y si me dices
 que tu am[Bb]or me esperará
 Tendré la l[E]uz
 que mi send[Am]ero alumbrará  [A7]
+
+[coro 2]
 Y volver[Dm]é  [G7]
 Como un ave
 que ret[C]orna a su nidal  [F]
@@ -30,6 +35,10 @@ volver[Bb]é y me quedaré  [E]
 Por esa paz que siempre,
 s[Am]iempre tú me das
 Que tú me d[E]as
+
+[Intro]
+
+[coro 1]
 No sufras más
 Quizás mañana
 nuestro llanto quede atrás
@@ -37,6 +46,8 @@ Y si me dices
 que tu amor me esperará
 Tendré la luz
 que mi sendero alumbrará
+
+[Coro 2]
 Y volveré
 Como un ave
 que retorna a su nidal
@@ -45,6 +56,8 @@ volveré y me quedaré
 Por esa paz que siempre,
 siempre tú me das
 Que tú me das
+
+[hablado]
 Y volveré
 A tus brazos caeré
 Las estrellas brillaran
