@@ -15,21 +15,21 @@ Ser[A7]á mej[Dm]or [G7]
 Seguir nuestra soled[Bb]ad  [F]
 Si hoy el cielo se nubl[Bb]o  [E]
 Quizás mañana brille el s[Am]ol  [A7]
-No sufras más
+No sufras m[Dm]ás  [G7]
 Quizás mañana
-nuestro llanto quede atrás
+nuestro ll[C]anto quede atrás  [F]
 Y si me dices
-que tu amor me esperará
-Tendré la luz
-que mi sendero alumbrará
-Y volveré
+que tu am[Bb]or me esperará
+Tendré la l[E]uz
+que mi send[Am]ero alumbrará  [A7]
+Y volver[Dm]é  [G7]
 Como un ave
-que retorna a su nidal
+que ret[C]orna a su nidal  [F]
 Veras que pronto
-volveré y me quedaré
+volver[Bb]é y me quedaré  [E]
 Por esa paz que siempre,
-siempre tú me das
-Que tú me das
+s[Am]iempre tú me das
+Que tú me d[E]as
 No sufras más
 Quizás mañana
 nuestro llanto quede atrás
