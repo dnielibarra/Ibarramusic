@@ -6,14 +6,14 @@ const baladas = [
   etiquetas: ["Balada", "Familiar"],
 
   letra: `
-Am[A7]or, adi[Dm]ós  [G]
+Am[A7]or, adi[Dm]ós  [G7]
 No se puede contin[C]uar  [F]
-Ya la magia termin[Bb]o
-Ahora tengo que marchar
-Será mejor
-Seguir nuestra soledad
-Si hoy el cielo se cubrió
-Quizás mañana brille el sol
+Ya la magia termin[Bb]o  [E]
+Ahora tengo que march[Am]ar
+Ser[A7]á mej[Dm]or [G7]
+Seguir nuestra soled[Bb]ad  [F]
+Si hoy el cielo se cubri[Bb]ó  [E]
+Quizás mañana brille el s[Am]ol  [A7]
 No sufras más
 Quizás mañana
 nuestro llanto quede atrás
