@@ -8,7 +8,7 @@ const baladas = [
     "Baladas",
     "Bronco"
   ],
-  letra: "Vamos
+  letra: 'Vamos
 a ponernos de acuerdo
 Me interesa contigo
 La reconciliación
@@ -67,7 +67,7 @@ a donde vamos
 Si no hemos podido
 Vivir separados
 
-."
+.'
 },
 
 {
