@@ -3,10 +3,9 @@ const baladas = [
 {
   titulo: "A qué le tiramos",
   autor: "Lupe Esparza / Bronco",
-  tono: "",
+  tono: "F#m",
   etiquetas: [
-    "Baladas",
-    "Bronco"
+    "Baladas", "Familiar"
   ],
   letra: 'Vamos
 a ponernos de acuerdo
