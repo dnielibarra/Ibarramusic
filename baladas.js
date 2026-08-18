@@ -1,4 +1,75 @@
 const baladas = [
+
+{
+  titulo: "A qué le tiramos",
+  autor: "Lupe Esparza / Bronco",
+  tono: "",
+  etiquetas: [
+    "Baladas",
+    "Bronco"
+  ],
+  letra: "Vamos
+a ponernos de acuerdo
+Me interesa contigo
+La reconciliación
+Siento
+que también tu me extrañas
+Que tampoco has tenido
+paz en tu corazón
+
+A que le tiramos
+si te quiero y me quieres
+Si no puedo olvidarte
+Si mi ausencia te hiere
+
+A que le tiramos corazón
+a donde vamos
+Si no hemos podido
+Vivir separados
+
+A que le tiramos corazón
+si tú me amas
+Si te llevo en la sangre
+Si entre sueños me llamas
+
+A que le tiramos corazon
+a donde vamos
+Si no hemos podido
+Vivir separados
+
+Todo
+lo hemos intentado
+y con otros amores
+No pudimos triunfar
+
+Vamos
+empecemos de nuevo
+Por favor no recuerdes
+lo que nos hizo mal
+
+A que le tiramos
+si te quiero y me quieres
+Si no puedo olvidarte
+Si mi ausencia te hiere
+
+A que le tiramos corazón
+a donde vamos
+Si no hemos podido
+Vivir separados
+
+A que le tiramos corazón
+si tú me amas
+Si te llevo en la sangre
+Y entre sueños me llamas
+
+A que le tiramos corazón
+a donde vamos
+Si no hemos podido
+Vivir separados
+
+."
+},
+
 {
   titulo: "Y volvere",
   autor: "Germain de la fuente",
@@ -127,4 +198,5 @@ E|--------------------------|
 `,
   historia: `Está es una canción italiana que se llama Emporte moi compuesta por Alain Barriere que después Germain escribió la letra en español..`
 }
+
 ];
