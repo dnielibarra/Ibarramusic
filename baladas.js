@@ -7,50 +7,63 @@ const baladas = [
   etiquetas: [
     "Baladas", "Familiar"
   ],
-  letra: `Vamos
+
+  letra: `
+[Verso 1]
+Vamos
 a ponernos de acuerdo
 Me interesa contigo
 La reconciliación
+
+[Verso 2]
 Siento
 que también tu me extrañas
 Que tampoco has tenido
 paz en tu corazón
 
+[Verso 3]
 A que le tiramos
 si te quiero y me quieres
 Si no puedo olvidarte
 Si mi ausencia te hiere
 
+[Coro 1]
 A que le tiramos corazón
 a donde vamos
 Si no hemos podido
 Vivir separados
 
+[Coro 2]
 A que le tiramos corazón
 si tú me amas
 Si te llevo en la sangre
 Si entre sueños me llamas
 
+[Coro 1]
 A que le tiramos corazon
 a donde vamos
 Si no hemos podido
 Vivir separados
 
+[Verso 1]
 Todo
 lo hemos intentado
 y con otros amores
 No pudimos triunfar
 
+[Verso 2]
 Vamos
 empecemos de nuevo
 Por favor no recuerdes
 lo que nos hizo mal
 
+[Coro 1]
 A que le tiramos
 si te quiero y me quieres
 Si no puedo olvidarte
 Si mi ausencia te hiere
 
+[Coro 2]
 A que le tiramos corazón
 a donde vamos
 Si no hemos podido
